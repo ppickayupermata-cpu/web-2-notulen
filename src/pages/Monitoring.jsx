@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useUi } from '../context/UiContext.jsx'
 import FilterBar, { GROUP_FIELDS, ITEM_FIELDS } from '../components/FilterBar.jsx'
 import GroupList from '../components/GroupList.jsx'
 import DataTable from '../components/DataTable.jsx'
@@ -8,12 +9,11 @@ import { filterGroups, filterRows } from '../utils/filter.js'
 import { PencilLine, ArrowLeft, Eye, Trash2 } from 'lucide-react'
 import InputData from './InputData.jsx'
 import Notulen from '../components/Notulen.jsx'
-import { ROLES } from '../config.js'
 
 const G0 = { container: '', buyer: '' }
 const I0 = { so: '', soItem: '', productCode: '' }
 
-export default function Monitoring({ role, by }) {
+export default function Monitoring({ by }) {
   const { rows, groups, removeGroup, updateGroup, applyChanges } = useData()
   const { confirm, dialog } = useConfirm()
   const [f, setF] = useState(G0)
@@ -22,8 +22,10 @@ export default function Monitoring({ role, by }) {
   const [msg, setMsg] = useState('')
   const [inputId, setInputId] = useState(null)
   const [nt, setNt] = useState(false)
+  const { jump, setJump } = useUi()
+  useEffect(() => { if (jump) { setInputId(null); setNt(false); setOpenId(jump.groupId); setFi({ ...I0, so: jump.so || '' }); setJump(null) } }, [jump])
   const calcRef = useRef(null) // fungsi hitung rumus dari tabel, dipakai notulen
-  const canDelete = ROLES[role].remove
+  const canDelete = true
   const open = groups.find((g) => g.id === openId)
 
   const del = async (g) => {
@@ -38,7 +40,7 @@ export default function Monitoring({ role, by }) {
     setMsg(`Container ${g.container} sudah dihapus.`)
   }
 
-  if (inputId) return <InputData role={role} groupId={inputId} onBack={() => setInputId(null)} />
+  if (inputId) return <InputData groupId={inputId} onBack={() => setInputId(null)} />
 
   // ---- Isi tabel satu parent group ----
   if (open) {
@@ -51,7 +53,7 @@ export default function Monitoring({ role, by }) {
         </div>
         <FilterBar fields={ITEM_FIELDS} value={fi} onChange={setFi} onClear={() => setFi(I0)} />
         <div className="count">{shown.length} baris</div>
-        <DataTable fileName={`Container-${open.container}`} rows={shown} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={ROLES[role].packing ? (r) => applyChanges({ [r.id]: { packed: r.packed ? '' : '1' } }) : undefined} />
+        <DataTable fileName={`Container-${open.container}`} rows={shown} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={(r) => applyChanges({ [r.id]: { packed: r.packed ? '' : '1' } })} />
         {nt && <Notulen calc={calcRef.current} group={open} rows={rows.filter((r) => r.groupId === open.id)} onClose={() => setNt(false)} />}
       </>
     )
@@ -69,7 +71,7 @@ export default function Monitoring({ role, by }) {
         empty={groups.length ? 'Tidak ada packing list yang cocok.' : 'Belum ada data. Upload file Excel di menu Upload Excel.'}
         actions={(g) => (
           <>
-            {ROLES[role].edit.length > 0 && <button className="btn sm primary" onClick={() => setInputId(g.id)}><PencilLine size={14} /> Input</button>}
+            <button className="btn sm primary" onClick={() => setInputId(g.id)}><PencilLine size={14} /> Input</button>
             <button className="btn sm" onClick={() => setOpenId(g.id)}><Eye size={14} /> View</button>
             {canDelete && <button className="btn sm danger" onClick={() => del(g)}><Trash2 size={14} /> Delete</button>}
           </>

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
-import { X, Download, UserPlus, NotebookPen, QrCode, Trash2, Copy, Lock, Unlock, RefreshCw } from 'lucide-react'
+import { X, Download, UserPlus, NotebookPen, QrCode, Trash2, Copy, Lock, Unlock, RefreshCw, History, Printer, ClipboardCheck } from 'lucide-react'
+import HalamanNotulen from './HalamanNotulen.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { api } from '../api.js'
 import { dariTabel, tglID } from '../utils/notulen.js'
 import { buatDocx, NOTE_DEFAULT } from '../utils/makeDocx.js'
+import { susunDokumen, gantiPeserta, parseIsi, teksBaris } from '../utils/isiNotulen.js'
 import { tgl, jam } from '../utils/notulenUtil.js'
 import { today } from '../utils/date.js'
 import JamMerah, { jamStr, tglPendek } from './JamMerah.jsx'
@@ -12,20 +14,23 @@ import JamMerah, { jamStr, tglPendek } from './JamMerah.jsx'
 const P0 = [['Desti', 'MKT'], ['Ajeng', 'MKT'], ['Eko N', 'PROD'], ['Kasiro', 'QC'], ['Banjar', 'QC'], ['Nanang', 'PROD'], ['Suyono', 'RND'], ['Syaeful', 'PROD'], ['Ainul', 'PROD'], ['Danny', 'PPIC'], ['Dadan', 'PPIC'], ['Syaeful', 'WH'], ['Irul', 'RND'], ['Reza', 'PROD']].map(([n, d]) => ({ n, d, hadir: false }))
 const lbl = (p) => `${p.n} ( ${p.d} )` // absensi di notulen: hanya nama dan bagian
 const baca = (id) => { try { return JSON.parse(localStorage.getItem('pl_nt_' + id)) || {} } catch { return {} } }
+const bacaRiw = (id) => { try { return JSON.parse(localStorage.getItem('pl_nth_' + id)) || [] } catch { return [] } }
+// teks halaman -> teks siap tempel di WhatsApp (judul *tebal*, bullet tetap)
+const keWA = (t) => String(t).split('\n').map((l) => { const h = l.match(/^\s*\*\s*(.+)$/); return h ? `*${h[1].trim()}*` : /^\s*NOTULEN\b/i.test(l) ? `*${l.trim()}*` : l }).join('\n')
 const MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 export default function Notulen({ group, rows, calc, onClose }) {
   const { token } = useData()
   const init = useRef(baca(group.id)).current
   const [info, setInfo] = useState(init.info || { nama: 'MEETING CUSTOM ORDER', tanggal: today(), ruang: '', mulai: '13:00', selesai: '15:00' })
-  const [prefix, setPrefix] = useState(init.prefix ?? `${group.container}${group.buyer ? ' ' + group.buyer : ''}`.trim())
-  const [tglKirim, setTglKirim] = useState(init.tglKirim ?? (group.shipDate || ''))
+  const [isi, setIsi] = useState(init.isi ?? null) // teks preview yang diedit bebas; null = ikuti tabel secara otomatis
   const [manual, setManual] = useState(init.manual || P0)
   const [np, setNp] = useState({ n: '', d: '' }), [err, setErr] = useState('')
+  const [riw, setRiw] = useState(() => bacaRiw(group.id)), [showRiw, setShowRiw] = useState(false), [copied, setCopied] = useState(false)
   const [room, setRoom] = useState(null), [log, setLog] = useState([]), [offset, setOffset] = useState(0), [link, setLink] = useState(''), [qr, setQr] = useState('')
   const roomId = room?.id
 
-  useEffect(() => { try { localStorage.setItem('pl_nt_' + group.id, JSON.stringify({ info, prefix, tglKirim, manual })) } catch {} }, [info, prefix, tglKirim, manual, group.id])
+  useEffect(() => { try { localStorage.setItem('pl_nt_' + group.id, JSON.stringify({ info, isi, manual })) } catch {} }, [info, isi, manual, group.id])
   useEffect(() => { const k = (e) => e.key === 'Escape' && onClose(); window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [])
 
   // ---------- absensi QR (log tampil langsung) ----------
@@ -41,15 +46,25 @@ export default function Notulen({ group, rows, calc, onClose }) {
   // nilai sel yang berisi rumus (=...) dihitung dulu, supaya yang masuk notulen adalah hasilnya, bukan teks rumus
   const tabel = dariTabel(calc ? rows.map((r) => ({ ...r, area: calc(r, 'area'), target: calc(r, 'target'), ket: calc(r, 'ket') })) : rows)
   const hadir = [...new Map([...log.map((e) => `${e.nama} ( ${e.bagian} )`), ...manual.filter((p) => p.hadir).map(lbl)].map((x) => [x.toLowerCase(), x])).values()]
-  const heading = [prefix, tglKirim ? 'RENCANA KIRIM ' + tglID(tglKirim).toUpperCase() : ''].filter(Boolean).join(' ')
-  const groups = [{ h: heading, items: tabel.items, bold: true }]
+  const prefix = init.prefix ?? `${group.container}${group.buyer ? ' ' + group.buyer : ''}`.trim(), tglKirim = init.tglKirim ?? (group.shipDate || '')
+  const heading = [prefix, tglKirim ? 'RENCANA KIRIM ' + tglID(tglKirim).toUpperCase() : 'RENCANA KIRIM'].filter(Boolean).join(' ')
+  const auto = susunDokumen({ judul: 'NOTULEN ' + info.nama.toUpperCase(), hari: tgl(info.tanggal), tempat: 'Ruang Meeting ' + (info.ruang || '-'), jam: `${jam(info.mulai)} WIB s/d ${jam(info.selesai)}`, hadir, items: tabel.items, heading, note: NOTE_DEFAULT })
+  const text = isi ?? auto, edited = isi !== null && isi !== auto
+  const done = new Set(teksBaris(tabel.items.filter((i) => i.selesai))) // baris sudah dipacking tetap diberi warna di Word selama teksnya tidak diubah
+  // riwayat versi: tiap kali diunduh / disimpan manual, teks halaman dicatat (15 terakhir, di browser ini)
+  const simpanVersi = (label) => { const n = [{ at: new Date().toISOString(), label, text }, ...riw.filter((v) => v.text !== text)].slice(0, 15); setRiw(n); try { localStorage.setItem('pl_nth_' + group.id, JSON.stringify(n)) } catch {} }
+  const pulihVersi = (v) => { if (window.confirm('Kembalikan halaman ke versi ' + new Date(v.at).toLocaleString('id-ID') + '? Ketikan sekarang akan diganti (tersimpan dulu sebagai versi).')) { simpanVersi('Sebelum dipulihkan'); setIsi(v.text); setShowRiw(false) } }
+  const salin = async () => { try { await navigator.clipboard.writeText(keWA(text)); setCopied(true); setTimeout(() => setCopied(false), 2500) } catch { setErr('Tidak bisa menyalin otomatis. Blok teks di halaman lalu salin manual (Ctrl+C).') } }
+  const cetak = () => { document.body.classList.add('print-notulen'); const done = () => { document.body.classList.remove('print-notulen'); window.removeEventListener('afterprint', done) }; window.addEventListener('afterprint', done); window.print() }
+  const susunUlang = () => { if (!edited || window.confirm('Susun ulang seluruh halaman dari tabel dan data meeting? Semua ketikan di preview akan diganti.')) setIsi(null) }
+  const pesertaBaru = () => setIsi(gantiPeserta(text, hadir)) // hanya daftar peserta yang diperbarui, ketikan lain aman
   const set = (k) => (e) => setInfo({ ...info, [k]: e.target.value })
   const tambah = () => { if (np.n.trim()) { setManual([...manual, { n: np.n.trim(), d: (np.d || '-').toUpperCase(), hadir: true }]); setNp({ n: '', d: '' }) } }
   const unduh = async () => {
     try {
-      const tpl = await (await fetch('/template-notulen.docx')).arrayBuffer(), meta = { nama: info.nama, tanggal: info.tanggal, ruang: info.ruang || '-', mulai: info.mulai, selesai: info.selesai }
-      const b = await buatDocx(tpl, 'NOTULEN ' + info.nama.toUpperCase(), meta, hadir, groups, NOTE_DEFAULT, true), a = document.createElement('a')
-      a.href = URL.createObjectURL(new Blob([b], { type: MIME })); a.download = `NOTULEN ${info.nama}.docx`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000)
+      const tpl = await (await fetch('/template-notulen.docx')).arrayBuffer()
+      const b = await buatDocx(tpl, parseIsi(text, done), true), a = document.createElement('a')
+      a.href = URL.createObjectURL(new Blob([b], { type: MIME })); a.download = `NOTULEN ${info.nama}.docx`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); simpanVersi('Diunduh (.docx)')
     } catch (e) { setErr('Gagal membuat Word: ' + e.message) }
   }
 
@@ -84,15 +99,17 @@ export default function Notulen({ group, rows, calc, onClose }) {
             <div className="chips">{manual.map((p, i) => <button key={i} className={'chip' + (p.hadir ? ' on' : '')} onClick={() => setManual(manual.map((x, j) => (j === i ? { ...x, hadir: !x.hadir } : x)))}>{lbl(p)}</button>)}</div>
             <div className="toolbar"><input placeholder="Nama" value={np.n} onChange={(e) => setNp({ ...np, n: e.target.value })} /><input placeholder="Bagian (PROD)" size="10" value={np.d} onChange={(e) => setNp({ ...np, d: e.target.value })} /><button className="btn sm" onClick={tambah}><UserPlus size={14} /> Tambah</button></div></details></div>
         <div className="ntsec"><h4>Notulen dari Excel yang diupload</h4>
-          <p className="hint">{tabel.baris} baris tabel diringkas menjadi {tabel.items.length} catatan ({tabel.po} PO). Kesamaan AREA dan TARGET SELESAI dalam satu PO dicatat sekali; PO yang sama dengan AREA berbeda ditulis berurutan dalam satu baris.{tabel.selesai ? ` ${tabel.selesai} catatan sudah dipacking ditaruh paling bawah (warna hijau).` : ''}{tabel.kosong ? ` ${tabel.kosong} baris belum diisi AREA / TARGET / KETERANGAN dan dilewati.` : ''} Judul dan tanggal pengiriman di bawah bisa diedit langsung.</p>
-          <div className="paper"><div className="ttlbox">{'NOTULEN ' + info.nama.toUpperCase()}</div>
-            <div className="kv"><span>Hari,Tanggal</span><span>:</span><span>{tgl(info.tanggal)}</span><span>Tempat</span><span>:</span><span>Ruang Meeting {info.ruang || '-'}</span><span>Jam</span><span>:</span><span>{jam(info.mulai)} WIB s/d {jam(info.selesai)}</span><span>Peserta</span><span>:</span><span /></div>
-            <ol>{hadir.map((h) => <li key={h}>{h}</li>)}</ol>
-            <div className="g">*<input className="inl" aria-label="Judul kelompok" size={Math.max(6, prefix.length)} value={prefix} onChange={(e) => setPrefix(e.target.value)} /> RENCANA KIRIM <input className="inl" aria-label="Tanggal pengiriman" type={/^\d{4}-\d{2}-\d{2}$/.test(tglKirim) || !tglKirim ? 'date' : 'text'} value={tglKirim} onChange={(e) => setTglKirim(e.target.value)} />
-              <span className="hint noprint"> → {tglKirim ? tglID(tglKirim).toUpperCase() : 'kosong'}</span></div>
-            <ul>{tabel.items.map((it, j) => <li key={j} className={'b' + (it.selesai ? ' done' : '')}>{it.t}</li>)}</ul>
-            <div className="note">NOTE : {NOTE_DEFAULT}</div></div>
-          <button className="btn primary" disabled={!tabel.items.length} onClick={unduh}><Download size={15} /> Unduh notulen (.docx)</button></div>
+          <p className="hint">{tabel.baris} baris tabel diringkas menjadi {tabel.items.length} catatan ({tabel.po} PO), tiap SO satu blok dengan jarak antar SO. Kesamaan AREA dan TARGET SELESAI dalam satu PO dicatat sekali.{tabel.selesai ? ` ${tabel.selesai} catatan sudah dipacking ditaruh paling bawah (warna hijau).` : ''}{tabel.kosong ? ` ${tabel.kosong} baris belum diisi AREA / TARGET / KETERANGAN dan dilewati.` : ''} Seluruh halaman di bawah (judul, keterangan, peserta, catatan, NOTE) bisa diedit langsung; hasil unduhan Word mengikuti teks ini. Mengubah data meeting di atas hanya otomatis menyusun halaman selama belum Anda ketik sendiri.</p>
+          <div className="paper print-area"><HalamanNotulen text={text} done={done} onText={setIsi} onPeserta={pesertaBaru} onSusun={susunUlang} canSusun={isi !== null} /></div>
+          <div className="toolbar wrap">
+            <button className="btn primary" disabled={!text.trim()} onClick={unduh}><Download size={15} /> Unduh notulen (.docx)</button>
+            <button className="btn" disabled={!text.trim()} onClick={cetak} title="Buka dialog cetak: pilih 'Simpan sebagai PDF' untuk membuat PDF"><Printer size={15} /> Cetak / PDF</button>
+            <button className="btn" disabled={!text.trim()} onClick={salin} title="Salin teks notulen untuk ditempel di WhatsApp"><>{copied ? <ClipboardCheck size={15} /> : <Copy size={15} />}</> {copied ? 'Tersalin' : 'Salin teks (WhatsApp)'}</button>
+            <button className="btn" onClick={() => simpanVersi('Disimpan manual')} title="Catat versi halaman saat ini"><History size={15} /> Simpan versi</button>
+            <button className={'btn' + (showRiw ? ' on' : '')} disabled={!riw.length} onClick={() => setShowRiw((v) => !v)}><History size={15} /> Riwayat versi ({riw.length})</button>
+          </div>
+          {showRiw && <div className="riw">{riw.map((v) => <div key={v.at} className="riw-r"><span>{new Date(v.at).toLocaleString('id-ID')} · {v.label}</span><button className="btn sm" onClick={() => pulihVersi(v)}>Kembalikan</button></div>)}</div>}
+        </div>
       </div>
     </div>
   )

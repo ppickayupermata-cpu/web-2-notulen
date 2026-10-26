@@ -5,16 +5,16 @@ import DataTable from '../components/DataTable.jsx'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { filterGroups, filterRows } from '../utils/filter.js'
-import { ROLES } from '../config.js'
+import { ALL_COLS } from '../config.js'
 import Notulen from '../components/Notulen.jsx'
 import { Undo2, Save, X, ArrowLeft, Pencil } from 'lucide-react'
 
 const G0 = { container: '', buyer: '' }
 const I0 = { so: '', soItem: '', productCode: '' }
 
-export default function InputData({ role, groupId, onBack }) {
+export default function InputData({ groupId, onBack }) {
   const { rows, groups, applyChanges } = useData()
-  const editable = ROLES[role].edit
+  const editable = ALL_COLS.map((c) => c.key)
   const { confirm, dialog } = useConfirm()
   const [f, setF] = useState(G0)              // cari container & buyer (daftar)
   const [fi, setFi] = useState(I0)            // cari SO, SO item, product code (di dalam container)
@@ -80,9 +80,9 @@ export default function InputData({ role, groupId, onBack }) {
             </>
           )}
           {msg && <span className="msg ok">{msg}</span>}
-          {editing && <span className="hint">Isi sel kuning (Enter/panah bawah pindah baris), lalu klik Submit.</span>}
+          {editing && <span className="hint">Klik sel untuk memilih; klik 2x (atau F2 / langsung ketik) untuk mengisi sel kuning. Enter / Tab menyimpan dan pindah sel, Esc membatalkan. Setelah selesai klik Submit.</span>}
         </div>
-        <DataTable fileName={`Container-${open.container}`} rows={shown} manage={ROLES[role].upload} groupId={open.id} editable={editable} editing={editing} getValue={getValue} onChange={change} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={ROLES[role].packing ? (r) => applyChanges({ [r.id]: { packed: r.packed ? '' : '1' } }) : undefined} />
+        <DataTable fileName={`Container-${open.container}`} rows={shown} manage groupId={open.id} editable={editable} editing={editing} getValue={getValue} onChange={change} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={(r) => applyChanges({ [r.id]: { packed: r.packed ? '' : '1' } })} />
         {nt && <Notulen calc={calcRef.current} group={open} rows={rows.filter((r) => r.groupId === open.id)} onClose={() => setNt(false)} />}
         {dialog}
       </>

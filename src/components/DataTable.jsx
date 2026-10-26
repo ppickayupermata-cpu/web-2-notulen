@@ -1,30 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { buildStyledXlsx } from '../utils/exportStyled.js'
-import { Columns3, Eye, EyeOff, PaintBucket, Baseline, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Merge, Eraser, RotateCcw, Download, ChevronUp, ChevronDown, Undo2, Redo2, Filter, Snowflake, Plus, Trash2, WrapText, NotebookPen, Ungroup, Search, Replace, AlarmClock, ArrowDownToLine, ArrowRightToLine, MoveHorizontal, X, PackageCheck } from 'lucide-react'
+import { Columns3, Eye, EyeOff, PaintBucket, Baseline, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Merge, Eraser, RotateCcw, Download, ChevronUp, ChevronDown, Undo2, Redo2, Filter, Snowflake, Plus, Trash2, WrapText, NotebookPen, Ungroup, Search, Replace, AlarmClock, ArrowDownToLine, ArrowRightToLine, MoveHorizontal, X, PackageCheck, History, Printer, ChevronsUp, ChevronsDown, ChevronLeft, ChevronRight, AlertTriangle, CalendarClock } from 'lucide-react'
 import { ALL_COLS } from '../config.js'
 import { useData } from '../context/DataContext.jsx'
 import { useConfirm } from './ConfirmDialog.jsx'
 import { today } from '../utils/date.js'
+import { evaluate, XlErr } from '../utils/formula.js'
 
-const num = (v) => { const n = parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : 0 }
 const isN = (x) => x !== '' && x != null && Number.isFinite(Number(x))
 const show = (c, v) => (c.type === 'date' && v && !String(v).startsWith('#') ? String(v).split('-').reverse().join('/') : v)
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch { return d } }
-const flat = (a) => a.flat(9)
-const FN = {
-  SUM: (...a) => flat(a).reduce((s, x) => s + num(x), 0),
-  AVERAGE: (...a) => { const f = flat(a).filter(isN); return f.reduce((s, x) => s + num(x), 0) / f.length },
-  MIN: (...a) => Math.min(...flat(a).filter(isN).map(num)), MAX: (...a) => Math.max(...flat(a).filter(isN).map(num)),
-  COUNT: (...a) => flat(a).filter(isN).length, IF: (c, a, b = '') => (c ? a : b),
-  ROUND: (x, n = 0) => Number(num(x).toFixed(n)), ABS: (x) => Math.abs(num(x)),
-  UPPER: (x) => String(x ?? '').toUpperCase(), LOWER: (x) => String(x ?? '').toLowerCase(), LEN: (x) => String(x ?? '').length, TRIM: (x) => String(x ?? '').trim().replace(/\s+/g, ' '),
-  CONCAT: (...a) => flat(a).join(''), LEFT: (x, n = 1) => String(x ?? '').slice(0, n), RIGHT: (x, n = 1) => (n ? String(x ?? '').slice(-n) : ''),
-  AND: (...a) => flat(a).every(Boolean), OR: (...a) => flat(a).some(Boolean), NOT: (x) => !x,
-}
-const FNRE = new RegExp('\\b(' + Object.keys(FN).join('|') + '|C|R)\\b', 'g')
 
 export default function DataTable({ rows, editable = [], editing = false, getValue, onChange, selectable = false, selected = [], onToggle, onToggleAll, fileName, manage = false, groupId, onNotulen, onPack }) {
-  const { settings, setSettings, addRows, removeRows, rows: allRows } = useData()
+  const { settings, setSettings, addRows, removeRows, rows: allRows, cellHistory, applyChanges } = useData()
   const { confirm, dialog } = useConfirm()
   const extra = (settings.cols || []).map((c) => ({ ...c, type: 'text' }))
   const all = [...ALL_COLS, ...extra]
@@ -33,6 +21,7 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
   const [menu, setMenu] = useState(false)
   const [sel, setSel] = useState(null)
   const [drag, setDrag] = useState(false)
+  const [ed, setEd] = useState(null) // sel yang sedang diketik (mode edit seperti Excel): { id, key, orig }
   const [sort, setSort] = useState(null)
   const [flt, setFlt] = useState({}); const [showF, setShowF] = useState(false)
   const [fz, setFz] = useState(0)
@@ -40,32 +29,36 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
   const [fm, setFm] = useState(() => load('pl_fmt', {}))
   const [mg, setMg] = useState(() => load('pl_merge', []))
   const [past, setPast] = useState([]); const [fut, setFut] = useState([])
-  const [warn, setWarn] = useState(() => load('pl_warn', false)) // sorot TARGET yang sudah lewat dan belum ada tanggal pengiriman
+  const [warn, setWarn] = useState(() => { try { const v = localStorage.getItem('pl_warn'); return v === null ? true : JSON.parse(v) } catch { return true } }) // sorot TARGET yang sudah lewat dan belum ada tanggal pengiriman
+  const [rh, setRh] = useState(null) // riwayat sel: { row, col, list }
   const [fnd, setFnd] = useState(null) // cari & ganti: { q, rep, n, cs }
   useEffect(() => { try { localStorage.setItem('pl_fmt', JSON.stringify(fm)); localStorage.setItem('pl_merge', JSON.stringify(mg)); localStorage.setItem('pl_w2', JSON.stringify(wd)); localStorage.setItem('pl_warn', JSON.stringify(warn)) } catch {} }, [fm, mg, wd, warn])
   // buang merge yatim (baris sudah dihapus) supaya tidak menjadi gabungan hantu yang tak bisa dilepas
   useEffect(() => { const ids = new Set([...(allRows || []), ...rows].map((r) => r.id)); if (ids.size) setMg((m) => (m.some((x) => !ids.has(x.id)) ? m.filter((x) => ids.has(x.id)) : m)) }, [allRows, rows])
   useEffect(() => { document.querySelector('td.curhit')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }) }, [fnd?.n, fnd?.q])
+  // posisi gulir diingat (sampai tab ditutup) + bayangan tepi tabel sebagai tanda masih ada kolom di luar layar
+  const wrapRef = useRef(null), sv = useRef(0), skey = 'pl_scroll_' + (fileName || 'tabel')
+  const edge = () => { const w = wrapRef.current; if (!w) return; w.classList.toggle('sl', w.scrollLeft > 4); w.classList.toggle('sr', w.scrollLeft + w.clientWidth < w.scrollWidth - 4) }
+  useEffect(() => { const w = wrapRef.current; if (!w) return; try { const p = JSON.parse(sessionStorage.getItem(skey)); if (p) requestAnimationFrame(() => requestAnimationFrame(() => { w.scrollTop = p.t; w.scrollLeft = p.l; edge() })) } catch {} }, [])
+  useEffect(() => { edge() })
+  const onScroll = (e) => { edge(); const w = e.currentTarget; cancelAnimationFrame(sv.current); sv.current = requestAnimationFrame(() => { try { sessionStorage.setItem(skey, JSON.stringify({ t: w.scrollTop, l: w.scrollLeft })) } catch {} }) }
   useEffect(() => { const up = () => setDrag(false); window.addEventListener('mouseup', up); return () => window.removeEventListener('mouseup', up) }, [])
 
   const val = (r, k) => (getValue ? getValue(r, k) : r[k])
-  // Rumus: =SUM(I1:I5), =I1+I2*2, =IF(I1>10,1,0). Huruf kolom A.. = urutan kolom, angka = nomor baris (#).
-  const calc = (r, k, d = 0) => {
+  // Rumus (mesin aman di utils/formula.js, tanpa eval): =SUM(J1:J5), =IF(J1>10,"BANYAK","SEDIKIT"), =A1&" "&B1, IFERROR, COUNTIF, dst.
+  // Huruf kolom A.. = urutan kolom (arahkan kursor ke judul kolom untuk melihat hurufnya), angka = nomor baris (#).
+  const calc = (r, k, stack = []) => {
     const v = val(r, k)
     if (typeof v !== 'string' || v[0] !== '=') return v ?? ''
-    if (d > 15) return '#REF!'
+    const me = r.id + '|' + k
+    if (stack.includes(me)) return '#REF!' // rujukan melingkar
+    const st = [...stack, me]
     const cell = (a, n) => {
-      const row = rows[n - 1], c = all[a.charCodeAt(0) - 65]; if (!row || !c) throw 0
-      const x = calc(row, c.key, d + 1); if (String(x)[0] === '#') throw 0
-      return x === '' ? 0 : isN(x) ? Number(x) : x
+      const row = rows[n - 1], c = all[a.charCodeAt(0) - 65]; if (!row || !c) throw new XlErr('#REF!')
+      const x = calc(row, c.key, st); if (typeof x === 'string' && x[0] === '#') throw new XlErr(x)
+      return isN(x) ? Number(x) : x
     }
-    const range = (a, n1, b, n2) => { const o = []; for (let i = n1; i <= n2; i++) for (let c = a.charCodeAt(0); c <= b.charCodeAt(0); c++) { try { o.push(cell(String.fromCharCode(c), i)) } catch { o.push('') } } return o }
-    try {
-      const s = v.slice(1).toUpperCase().replace(/([A-Z])(\d+):([A-Z])(\d+)/g, 'R("$1",$2,"$3",$4)').replace(/(?<![A-Z"])([A-Z])(\d+)(?![\d"(])/g, 'C("$1",$2)').replace(/<>/g, '!=').replace(/(?<![<>!=])=(?!=)/g, '==')
-      if (/[A-Za-z_$`\\]/.test(s.replace(FNRE, '').replace(/"[A-Z]"/g, ''))) return '#NAME?'
-      const res = new Function('C', 'R', ...Object.keys(FN), `"use strict";return (${s})`)(cell, range, ...Object.values(FN))
-      return typeof res === 'number' ? (Number.isFinite(res) ? Number(res.toFixed(6)) : '#DIV/0!') : typeof res === 'boolean' ? (res ? 'TRUE' : 'FALSE') : String(res)
-    } catch { return '#ERROR!' }
+    return evaluate(v.slice(1), { cell })
   }
 
   const cols = all.filter((c) => !hc.includes(c.key))
@@ -109,7 +102,8 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
   }
   const fillAll = (v) => { if (editing) each((r, c) => edt.includes(c.key) && onChange(r.id, c.key, v)) } // Ctrl+Enter / Ctrl+;
   const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const fh = fnd?.q ? vis.flatMap((r, i) => cols.flatMap((c, ci) => (new RegExp(esc(fnd.q), fnd.cs ? '' : 'i').test(String(calc(r, c.key) ?? '')) ? [{ i, ci, key: c.key }] : []))) : []
+  const fre = fnd?.q ? new RegExp(esc(fnd.q), fnd.cs ? '' : 'i') : null
+  const fh = fre ? vis.flatMap((r, i) => cols.flatMap((c, ci) => (fre.test(String(calc(r, c.key) ?? '')) ? [{ i, ci, key: c.key }] : []))) : []
   const fcur = fh.length ? fh[((fnd.n % fh.length) + fh.length) % fh.length] : null, fset = new Set(fh.map((h) => h.i + ',' + h.ci))
   const repl = (list) => { if (!editing) return; const re = new RegExp(esc(fnd.q), fnd.cs ? 'g' : 'gi'); list.forEach((h) => { if (edt.includes(h.key)) onChange(vis[h.i].id, h.key, String(val(vis[h.i], h.key) ?? '').replace(re, fnd.rep)) }) }
   const st = rg && (() => { let n = 0, k = 0, sm = 0, mn = Infinity, mx = -Infinity; each((r, c) => { const v = calc(r, c.key); if (v === '' || v == null) return; n++; if (isN(v)) { const x = Number(v); k++; sm += x; mn = Math.min(mn, x); mx = Math.max(mx, x) } }); return { cells: (rg.r1 - rg.r0 + 1) * (rg.c1 - rg.c0 + 1), n, k, sm, mn, mx } })()
@@ -170,15 +164,27 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
     if (k === ';' && cols[rg?.c0]?.type === 'date') return ok(() => fillAll(today()))
     return false
   }
-  const move = (e, i, ci) => { if (hot(e)) return; const d = { ArrowDown: 1, Enter: 1, ArrowUp: -1 }[e.key]; if (!d) return; e.preventDefault(); document.getElementById(`cell-${vis[i + d]?.id}-${cols[ci].key}`)?.focus() }
+  // ---- edit ala Excel: klik = pilih sel, klik 2x / F2 / langsung mengetik = isi sel; Enter / Tab menyimpan dan pindah; Esc membatalkan ----
+  const okEdit = (r, c) => !!(editing && r && c && edt.includes(c.key))
+  const reveal = (i, ci) => requestAnimationFrame(() => wrapRef.current?.querySelector(`[data-rc="${i},${ci}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }))
+  const clampI = (i) => Math.max(0, Math.min(vis.length - 1, i)), clampC = (c) => Math.max(0, Math.min(cols.length - 1, c))
+  const go = (i, ci) => { const ni = clampI(i), nc = clampC(ci); setSel({ a: [ni, nc], b: [ni, nc] }); reveal(ni, nc) }
+  const done = () => { setEd(null); wrapRef.current?.focus({ preventScroll: true }) }
+  const startEdit = (i, ci) => { const r = vis[i], c = cols[ci]; if (okEdit(r, c)) setEd({ id: r.id, key: c.key, orig: val(r, c.key) ?? '' }) }
+  const editKey = (e, i, ci, r, c, multi) => {
+    if (hot(e)) return
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onChange(r.id, c.key, ed?.orig ?? ''); done(); return }
+    if (e.key === 'Enter' && !(multi && e.shiftKey)) { e.preventDefault(); done(); go(i + (e.shiftKey ? -1 : 1), ci); return }
+    if (e.key === 'Tab') { e.preventDefault(); done(); go(i, ci + (e.shiftKey ? -1 : 1)) }
+  }
   const onCopy = (e) => {
-    if (!rg || e.target.tagName === 'INPUT') return
+    if (!rg || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
     const t = []; for (let i = rg.r0; i <= rg.r1; i++) t.push(cols.slice(rg.c0, rg.c1 + 1).map((c) => val(vis[i], c.key) ?? '').join('\t'))
     e.clipboardData.setData('text/plain', t.join('\n')); e.preventDefault()
   }
   const onPaste = (e) => {
     const tx = e.clipboardData.getData('text')
-    if (!editing || !rg || (!/[\t\n]/.test(tx.trim()) && e.target.tagName === 'INPUT')) return
+    if (!editing || !rg || (!/[\t\n]/.test(tx.trim()) && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA'))) return
     e.preventDefault()
     tx.replace(/\r/g, '').replace(/\n$/, '').split('\n').forEach((ln, a) => ln.split('\t').forEach((v, b) => { const r = vis[rg.r0 + a], c = cols[rg.c0 + b]; if (r && c && edt.includes(c.key)) onChange(r.id, c.key, v) }))
   }
@@ -188,8 +194,31 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo() }
     else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo() }
     else if (editing && e.key === 'Delete') each((r, c) => edt.includes(c.key) && onChange(r.id, c.key, ''))
+    else if (rg && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const arrow = e.key.startsWith('Arrow')
+      const d = { ArrowDown: [1, 0], ArrowUp: [-1, 0], ArrowRight: [0, 1], ArrowLeft: [0, -1] }[e.key] || (e.key === 'Tab' && editing ? [0, e.shiftKey ? -1 : 1] : e.key === 'Enter' ? [e.shiftKey ? -1 : 1, 0] : null)
+      if (d) {
+        e.preventDefault(); const cur = e.shiftKey && arrow ? sel.b : sel.a, ni = clampI(cur[0] + d[0]), nc = clampC(cur[1] + d[1])
+        if (e.shiftKey && arrow) { setSel({ a: sel.a, b: [ni, nc] }); reveal(ni, nc) } else go(ni, nc)
+        return
+      }
+      const r = vis[rg.r0], c = cols[rg.c0]
+      if (e.key === 'F2' && okEdit(r, c)) { e.preventDefault(); startEdit(rg.r0, rg.c0) }
+      else if (e.key.length === 1 && okEdit(r, c) && c.type !== 'date') { e.preventDefault(); onChange(r.id, c.key, e.key); setEd({ id: r.id, key: c.key, orig: val(r, c.key) ?? '' }) } // mengetik langsung = ganti isi sel
+    }
   }
   const first = rg && fm[vis[rg.r0]?.id + '|' + cols[rg.c0]?.key]
+  // ---- navigasi antar tabel SO + ringkasan target ----
+  const sob = () => [...(wrapRef.current?.querySelectorAll('.sobox') || [])]
+  const goTo = (i) => { const w = wrapRef.current; if (!w) return; const go = () => { const el = sob()[i]; if (el) w.scrollTop += el.getBoundingClientRect().top - w.getBoundingClientRect().top - 6 }; go(); requestAnimationFrame(go) } // dua kali: tinggi tabel di bawah baru terukur setelah tergambar
+  const curSo = () => { const w = wrapRef.current; if (!w) return 0; const t = w.getBoundingClientRect().top + 10, i = sob().findIndex((e) => e.getBoundingClientRect().bottom > t); return i < 0 ? 0 : i }
+  const un = rows.filter((r) => !r.packed)
+  const tgt = (r) => String(calc(r, 'target') ?? ''), kirimOf = (r) => String(calc(r, 'kirim') ?? '').trim() // hasil rumus ikut dihitung
+  const nLate = un.filter((r) => tgt(r) && tgt(r) < todayS && !kirimOf(r)).length, nToday = un.filter((r) => tgt(r) === todayS).length
+  const nNoArea = un.filter((r) => !String(calc(r, 'area') ?? '').trim()).length
+  const perArea = Object.entries(un.reduce((m, r) => { const a = String(calc(r, 'area') ?? '').trim().toUpperCase(); if (a) m[a] = (m[a] || 0) + 1; return m }, {})).sort((a, b) => b[1] - a[1])
+  const bukaRh = async () => { if (!rg || !vis[rg.r0] || !cols[rg.c0]) return; const row = vis[rg.r0], col = cols[rg.c0]; setRh({ row, col, list: null }); setRh({ row, col, list: await cellHistory(row.id, col.key) }) }
+  const kembalikan = async (e) => { if (!(await confirm({ title: 'Kembalikan nilai sel?', message: `Sel ${rh.col.label} diubah kembali menjadi "${show(rh.col, e.old) || '(kosong)'}".`, confirmLabel: 'Kembalikan' }))) return; await applyChanges({ [rh.row.id]: { [rh.col.key]: e.old } }); setRh(null) }
   const B = ({ t, d, f, children, cls = 'icon-btn dark' }) => <button className={cls} disabled={d} title={t} onClick={f}>{children}</button>
 
   return (
@@ -231,10 +260,12 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
           {editing && <><B t="Isi ke bawah (Ctrl+D)" d={!rg} f={() => fill('down')}><ArrowDownToLine size={15} /></B><B t="Isi ke kanan (Ctrl+R)" d={!rg} f={() => fill('right')}><ArrowRightToLine size={15} /></B></>}
           <span className="sep" />
           <B t="Cari & Ganti (Ctrl+F)" f={() => setFnd((x) => x || { q: '', rep: '', n: 0, cs: false })} cls={'icon-btn dark' + (fnd ? ' on' : '')}><Search size={15} /></B>
+          <B t="Riwayat perubahan sel terpilih (siapa, kapan) + kembalikan nilai" d={!rg} f={bukaRh}><History size={15} /></B>
           <B t="Sorot TARGET yang sudah lewat dan belum dikirim" f={() => setWarn((v) => !v)} cls={'icon-btn dark' + (warn ? ' on' : '')}><AlarmClock size={15} /></B>
           {manage && <><span className="sep" /><B t="Tambah baris di akhir" f={addRow} cls="btn sm"><Plus size={14} /> Baris</B><B t="Hapus baris terpilih" d={!rg} f={delRows} cls="btn sm"><Trash2 size={14} /> Baris</B></>}
           <span className="sep" />
           <B t="Unduh hasil sebagai Excel" f={exportXlsx} cls="btn sm primary"><Download size={15} /> Unduh Excel</B>
+          <B t="Cetak tabel (atau simpan sebagai PDF lewat dialog cetak)" f={() => window.print()} cls="btn sm"><Printer size={15} /> Cetak</B>
           {onNotulen && <B t="Catat notulen dari tabel ini" f={() => onNotulen(calc)} cls="btn sm"><NotebookPen size={15} /> Catat Notulen</B>}
         </div>
       </div>
@@ -247,12 +278,27 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
         <button className="icon-btn dark" title="Tutup (Esc)" onClick={() => setFnd(null)}><X size={15} /></button></div>}
       {st && st.n > 0 && <div className="statbar"><span>{st.cells} sel dipilih</span><span>Terisi: {st.n}</span>{st.k > 0 && <><span>Jumlah: <b>{nf(st.sm)}</b></span><span>Rata-rata: <b>{nf(st.sm / st.k)}</b></span><span>Min: {nf(st.mn)}</span><span>Maks: {nf(st.mx)}</span></>}</div>}
       <datalist id="dl-area">{areas.map((a) => <option key={a} value={a} />)}</datalist>
-      <div className="tablewrap pad" tabIndex={0} onCopy={onCopy} onPaste={onPaste} onKeyDown={onKey}>
+      {onNotulen && <div className="sumbar" aria-label="Ringkasan target">
+        <span className="sc ok"><PackageCheck size={14} /> Dipacking {rows.length - un.length}/{rows.length}</span>
+        <button className={'sc late' + (nLate ? '' : ' zero')} title="Target sudah lewat, belum dipacking dan belum ada tanggal pengiriman (klik untuk menyorot di tabel)" onClick={() => setWarn(true)}><AlertTriangle size={14} /> Terlambat {nLate}</button>
+        <span className={'sc due' + (nToday ? '' : ' zero')}><CalendarClock size={14} /> Target hari ini {nToday}</span>
+        <span className={'sc' + (nNoArea ? ' warn' : ' zero')}>AREA belum diisi {nNoArea}</span>
+        {perArea.map(([a, n]) => <button key={a} className={'sc area' + (flt.area === a ? ' on' : '')} title={'Tampilkan hanya AREA ' + a + ' (klik lagi untuk lepas)'} onClick={() => { setShowF(true); setFlt(flt.area === a ? {} : { area: a }) }}>{a} <b>{n}</b></button>)}
+      </div>}
+      {segs.length > 1 && <div className="sonav">
+        <span className="hint">{segs.length} SO</span>
+        <select aria-label="Lompat ke SO" value="" onChange={(e) => e.target.value !== '' && goTo(+e.target.value)}><option value="">Lompat ke SO…</option>{segs.map((sg, i) => <option key={sg.so} value={i}>SO {sg.so} ({sg.end - sg.start} baris)</option>)}</select>
+        <button className="btn sm" onClick={() => goTo(Math.max(curSo() - 1, 0))}><ChevronLeft size={14} /> SO sebelumnya</button>
+        <button className="btn sm" onClick={() => goTo(Math.min(curSo() + 1, segs.length - 1))}>SO berikutnya <ChevronRight size={14} /></button>
+        <button className="btn sm" onClick={() => wrapRef.current?.scrollTo({ top: 0 })}><ChevronsUp size={14} /> Atas</button>
+        <button className="btn sm" onClick={() => wrapRef.current?.scrollTo({ top: wrapRef.current.scrollHeight })}><ChevronsDown size={14} /> Bawah</button>
+      </div>}
+      <div ref={wrapRef} onScroll={onScroll} className="tablewrap pad" tabIndex={0} onCopy={onCopy} onPaste={onPaste} onKeyDown={onKey}>
         {segs.map((sg, si) => (
           <div key={sg.so} className="sobox" style={{ containIntrinsicSize: 'auto ' + (80 + (sg.end - sg.start) * 38) + 'px' }}>
             <div className="sotitle">SO {sg.so}<small> · {sg.end - sg.start} baris</small>
               <span className="sotools"><button className="btn sm" title="Sesuaikan lebar kolom dengan isinya (klik dua kali tepi header untuk satu kolom)" onClick={() => fit(sg.so)}><MoveHorizontal size={14} /> Auto-fit</button><button className="btn sm" title="Pakai ukuran kolom tabel ini untuk semua tabel" onClick={() => samakan(sg.so)}>Samakan ke semua</button><button className="btn sm" title="Kembalikan ukuran tabel ini ke bawaan" disabled={!wd.so?.[sg.so]} onClick={() => resetT(sg.so)}>Reset ukuran</button></span></div>
-            <table className="grid fx" style={{ width: tableW(sg.so) }}>
+            <table className={'grid fx' + (editing ? ' ex' : '')} style={{ width: tableW(sg.so) }}>
               <colgroup>{onPack && <col style={{ width: LP }} />}<col style={{ width: 56 }} />{selectable && <col style={{ width: 34 }} />}{cols.map((c) => <col key={c.key} style={{ width: W(c.key, sg.so) }} />)}{onPack && <col style={{ width: RP }} />}</colgroup>
               <thead>
                 <tr>
@@ -260,7 +306,7 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
                   <th className="rn" style={{ left: LP }}>#</th>
                   {selectable && <th><input type="checkbox" className="chk" checked={rows.every((r) => selected.includes(r.id))} onChange={onToggleAll} /></th>}
                   {cols.map((c, ci) => (
-                    <th key={c.key} className={(edt.includes(c.key) ? 'in ' : '') + (ci < fz ? 'frz' : '')} style={{ width: W(c.key, sg.so), minWidth: W(c.key, sg.so), maxWidth: W(c.key, sg.so), left: ci < fz ? off(ci, sg.so) : undefined }}>
+                    <th key={c.key} title={'Kolom ' + String.fromCharCode(65 + all.findIndex((x) => x.key === c.key)) + ' (untuk rumus)'} className={(edt.includes(c.key) ? 'in ' : '') + (ci < fz ? 'frz' : '')} style={{ width: W(c.key, sg.so), minWidth: W(c.key, sg.so), maxWidth: W(c.key, sg.so), left: ci < fz ? off(ci, sg.so) : undefined }}>
                       <span className="th">
                         <button className="hb" onClick={() => setSort((x) => (x?.key !== c.key ? { key: c.key, dir: 1 } : x.dir === 1 ? { key: c.key, dir: -1 } : null))}>
                           {c.label}{sort?.key === c.key && (sort.dir === 1 ? <ChevronUp size={13} /> : <ChevronDown size={13} />)}
@@ -286,15 +332,19 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
                       if (covered.has(i + ',' + ci)) return null
                       const sp = spans[i + ',' + ci], s = fm[r.id + '|' + c.key] || {}
                       const canEdit = editing && edt.includes(c.key)
-                      const st = { background: s.bg || (r.packed ? 'var(--packed)' : ci < fz ? 'var(--card)' : undefined), color: s.color || (s.bg ? '#1f2433' : undefined), fontWeight: s.bold ? 700 : undefined, fontStyle: s.italic ? 'italic' : undefined, textAlign: s.align || (sp || c.key === 'qty' ? 'center' : undefined), verticalAlign: sp ? 'middle' : undefined, left: ci < fz ? off(ci, sg.so) : undefined, whiteSpace: s.wrap ? 'normal' : undefined, wordBreak: s.wrap ? 'break-word' : undefined, textOverflow: s.wrap ? 'clip' : undefined, ...(c.key === 'target' && !s.bg && late(r) ? { background: '#fee2e2', color: '#b91c1c', fontWeight: 600 } : {}) }
-                      const props = { id: `cell-${r.id}-${c.key}`, value: val(r, c.key) ?? '', onChange: (e) => onChange(r.id, c.key, e.target.value), ...(c.key === 'area' ? { list: 'dl-area' } : {}) }
-                      const input = s.wrap ? <textarea {...props} rows={1} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) move(e, i, ci) }} /> : <input {...props} type={c.type === 'date' ? 'date' : 'text'} onKeyDown={(e) => move(e, i, ci)} />
+                      const st = { background: s.bg || (r.packed ? 'var(--packed)' : ci < fz ? 'var(--card)' : undefined), color: s.color || (s.bg ? '#1f2433' : undefined), fontWeight: s.bold ? 700 : undefined, fontStyle: s.italic ? 'italic' : undefined, textAlign: s.align || (sp || c.key === 'qty' ? 'center' : undefined), verticalAlign: sp ? 'middle' : undefined, left: ci < fz ? off(ci, sg.so) : undefined, whiteSpace: s.wrap ? 'normal' : undefined, wordBreak: s.wrap ? 'break-word' : undefined, textOverflow: s.wrap ? 'clip' : undefined, ...(c.key === 'target' && !s.bg && late(r) ? { background: '#fee2e2', color: '#b91c1c', fontWeight: 600 } : {}), ...(c.key === 'target' && !s.bg && warn && !r.packed && tgt(r) === todayS ? { background: '#fef3c7', color: '#92400e', fontWeight: 600 } : {}) }
+                      const isEd = canEdit && ed && ed.id === r.id && ed.key === c.key
+                      const props = { id: `cell-${r.id}-${c.key}`, value: val(r, c.key) ?? '', onChange: (e) => onChange(r.id, c.key, e.target.value), ...(c.key === 'area' ? { list: 'dl-area' } : {}),
+                        onBlur: () => setEd((x) => (x && x.id === r.id && x.key === c.key ? null : x)),
+                        ref: (el) => { if (el && !el.dataset.f) { el.dataset.f = '1'; el.focus(); try { const n = el.value.length; el.setSelectionRange(n, n) } catch { /* input tanggal tidak punya kursor teks */ } } } }
+                      const input = s.wrap ? <textarea {...props} rows={1} onKeyDown={(e) => editKey(e, i, ci, r, c, true)} /> : <input {...props} type={c.type === 'date' ? 'date' : 'text'} onKeyDown={(e) => editKey(e, i, ci, r, c, false)} />
                       const shown = show(c, calc(r, c.key))
                       return (
-                        <td key={c.key} className={(canEdit ? 'edit ' : '') + (inR(i, ci) ? 'rng ' : '') + (ci < fz ? 'frz' : '') + (fset.has(i + ',' + ci) ? ' hit' : '') + (fcur && fcur.i === i && fcur.ci === ci ? ' curhit' : '')} style={st} rowSpan={sp?.rs} colSpan={sp?.cs}
-                          onMouseDown={(e) => { setSel(e.shiftKey && sel ? { a: sel.a, b: [i, ci] } : { a: [i, ci], b: [i, ci] }); setDrag(true) }}
+                        <td key={c.key} data-rc={i + ',' + ci} className={(canEdit ? 'edit ' : '') + (isEd ? 'ing ' : '') + (inR(i, ci) ? 'rng ' : '') + (ci < fz ? 'frz' : '') + (fset.has(i + ',' + ci) ? ' hit' : '') + (fcur && fcur.i === i && fcur.ci === ci ? ' curhit' : '')} style={st} rowSpan={sp?.rs} colSpan={sp?.cs}
+                          onMouseDown={(e) => { if (e.target.closest('input,textarea')) return; setSel(e.shiftKey && sel ? { a: sel.a, b: [i, ci] } : { a: [i, ci], b: [i, ci] }); setDrag(true) }}
+                          onDoubleClick={() => { setDrag(false); startEdit(i, ci) }}
                           onMouseEnter={() => drag && setSel((x) => x && { ...x, b: [i, ci] })}>
-                          {canEdit ? input : shown}
+                          {isEd ? input : shown}
                         </td>
                       )
                     })}
@@ -306,6 +356,13 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
           </div>
         ))}
       </div>
+      {rh && <div className="overlay" onClick={() => setRh(null)}><div className="modal" role="dialog" aria-modal="true" aria-label="Riwayat sel" style={{ width: 'min(560px,94vw)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="toolbar"><h3 style={{ margin: 0 }}>Riwayat sel · {rh.col.label}</h3><span className="spacer" /><button className="icon-btn" aria-label="Tutup" onClick={() => setRh(null)}><X size={18} /></button></div>
+        <p className="hint">SO {rh.row.so || '-'} · PO {rh.row.po || '-'} · {rh.row.productName}</p>
+        {!rh.list ? <div className="empty">Memuat…</div> : !rh.list.length ? <div className="empty">Belum ada perubahan tercatat untuk sel ini.</div> : (
+          <div className="riw">{rh.list.map((e, i) => <div key={i} className="riw-r"><span><b>{e.by || '-'}</b> · {new Date(e.at).toLocaleString('id-ID')}<br />{show(rh.col, e.old) || '(kosong)'} → <b>{show(rh.col, e.new) || '(kosong)'}</b></span><button className="btn sm" disabled={String(val(rh.row, rh.col.key) ?? '') === e.old} onClick={() => kembalikan(e)}><RotateCcw size={13} /> Kembalikan</button></div>)}</div>
+        )}
+      </div></div>}
       {dialog}
     </>
   )

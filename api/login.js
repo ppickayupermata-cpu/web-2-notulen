@@ -13,8 +13,10 @@ export default async function handler(req, res) {
     let users = []
     try { users = JSON.parse(process.env.APP_USERS || '[]') } catch { /* ENV salah format */ }
     const { username = '', password = '' } = await readBody(req)
+    // aplikasi hanya untuk PPIC: akun lama berperan warehouse/readonly di ENV tidak lagi boleh masuk (supaya tidak otomatis jadi PPIC)
+    users = users.filter((x) => !x.role || x.role === 'ppic')
     const u = users.find((x) => same(x.username, username) && same(x.password, password))
     if (!u) return send(res, 401, { error: 'Username atau password salah.' })
-    send(res, 200, { username: u.username, role: u.role, token: signToken(u) })
+    send(res, 200, { username: u.username, token: signToken(u) })
   } catch (e) { fail(res, e) }
 }

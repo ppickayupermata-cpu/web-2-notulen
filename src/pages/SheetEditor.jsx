@@ -109,7 +109,7 @@ export default function SheetEditor() {
   const rg = sel && { r0: Math.min(sel.a[0], sel.b[0]), r1: Math.max(sel.a[0], sel.b[0]), c0: Math.min(sel.a[1], sel.b[1]), c1: Math.max(sel.a[1], sel.b[1]) }
   const each = (fn) => { if (rg) for (let r = rg.r0; r <= rg.r1; r++) for (let c = rg.c0; c <= rg.c1; c++) fn(r, c) }
   const onCopy = (e) => {
-    if (!rg || ed) return
+    if (!rg) return
     const t = []; for (let r = rg.r0; r <= rg.r1; r++) { const row = []; for (let c = rg.c0; c <= rg.c1; c++) row.push(text(r, c)); t.push(row.join('\t')) }
     e.clipboardData.setData('text/plain', t.join('\n')); e.preventDefault()
   }

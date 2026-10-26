@@ -1,8 +1,8 @@
 // Tabel packing list -> catatan notulen.
-// Format: (SO), (PO) ada di (AREA) target selesai (TARGET SELESAI), KETERANGAN
-// - Dalam satu PO, kesamaan AREA + TARGET SELESAI dicatat SATU kali saja (mewakili); KETERANGAN yang berbeda digabung.
-// - SO sama + PO sama tetapi AREA berbeda: satu baris, SO hanya di awal:
-//   (SO), (PO) ada di (AREA) target selesai (TGL), KETERANGAN, (PO) ada di (AREA) target selesai (TGL), KETERANGAN
+// Format satu catatan: (PO) ada di (AREA) target selesai (TARGET SELESAI), ( KETERANGAN )   <- keterangan dalam tanda kurung
+// - Dalam satu PO, kesamaan AREA + TARGET SELESAI dicatat SATU kali saja (mewakili); KETERANGAN yang berbeda digabung dengan ";".
+// - Satu SO = satu daftar: baris pertama diawali "(SO), " sebagai bullet tingkat 1; catatan berikutnya di SO yang sama (AREA lain
+//   atau PO lain) menjadi bullet tingkat 2 tanpa mengulang SO (lihat susun() di isiNotulen.js).
 // - Baris yang sudah ditag packing ditaruh PALING BAWAH (format sama, diberi warna selesai).
 const BLN = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember']
 export const tglID = (s) => { const m = String(s || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]} ${BLN[+m[2] - 1]} ${m[1]}` : String(s || '').trim().toLowerCase() }
@@ -15,9 +15,12 @@ function baris(rows) {
     const s = e.seg.get(area + '|' + tg) || e.seg.set(area + '|' + tg, { area, tg, kets: [] }).get(area + '|' + tg)
     if (ket && !s.kets.includes(ket)) s.kets.push(ket)
   }
-  return [...peta.values()].map((e) => ({
-    t: (e.so ? e.so + ', ' : '') + ((l) => (l.some((s) => s.area || s.tg || s.kets.length) ? l.filter((s) => s.area || s.tg || s.kets.length) : l.slice(0, 1)))([...e.seg.values()]).map((s) => e.po + (s.area ? ` ada di ${s.area}` : '') + (s.tg ? ` target selesai ${s.tg}` : '') + (s.kets.length ? `, ${s.kets.join('; ')}` : '')).join(', '), order: '',
-  }))
+  const adaIsi = (s) => s.area || s.tg || s.kets.length
+  return [...peta.values()].map((e) => {
+    const l = [...e.seg.values()], segs = (l.some(adaIsi) ? l.filter(adaIsi) : l.slice(0, 1))
+      .map((s) => e.po + (s.area ? ` ada di ${s.area}` : '') + (s.tg ? ` target selesai ${s.tg}` : '') + (s.kets.length ? `, ( ${s.kets.join('; ')} )` : ''))
+    return { so: e.so, po: e.po, segs, t: (e.so ? e.so + ', ' : '') + segs.join(', '), order: '' }
+  })
 }
 export function dariTabel(rows) {
   const belum = [], sudah = []; let kosong = 0

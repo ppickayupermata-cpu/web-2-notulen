@@ -1,4 +1,4 @@
-import { ROLES, randomUUID, getSql, ensureDb, verifyToken, readBody, send, fail, clip } from './_lib.js'
+import { randomUUID, getSql, ensureDb, verifyToken, readBody, send, fail, clip } from './_lib.js'
 
 // Absensi lewat QR. Yang PUBLIK (tanpa login): melihat room (GET ?room=) dan mengirim absen (POST action=submit).
 // Yang butuh login PPIC: membuat room, menutup/membuka, menghapus entri. Waktu absen = jam server saat Submit diklik.
@@ -52,7 +52,6 @@ export default async function handler(req, res) {
     // ---------- khusus PPIC (login) ----------
     const user = verifyToken(req)
     if (!user) return send(res, 401, { error: 'Sesi habis. Silakan login lagi.' })
-    if (!ROLES[user.role]?.upload) return send(res, 403, { error: 'Hanya PPIC yang boleh mengelola absensi.' })
     switch (b.action) {
       case 'create': {
         const gid = String(b.groupId || '')

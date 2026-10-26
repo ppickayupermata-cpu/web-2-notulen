@@ -20,9 +20,3 @@ export const INPUT_COLS = [
   { key: 'kirim', label: 'TANGGAL PENGIRIMAN', type: 'date' },
 ]
 export const ALL_COLS = [...INFO_COLS, ...INPUT_COLS]
-
-export const ROLES = {
-  ppic:      { label: 'PPIC',      edit: [...INFO_COLS.map((c) => c.key), 'area', 'target', 'ket', 'kirim'], upload: true, remove: true, packing: true },
-  warehouse: { label: 'Warehouse', edit: ['ket'], upload: false, remove: false, packing: true },
-  readonly:  { label: 'Read Only', edit: [], upload: false, remove: false },
-}

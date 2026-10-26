@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
-import { ROLES } from '../config.js'
 
-const TYPES = { upload: 'Upload', hapus: 'Hapus', jadwal: 'Jadwal' }
+const TYPES = { upload: 'Upload', hapus: 'Hapus', jadwal: 'Jadwal', error: 'Error' }
 
-export default function Riwayat({ role }) {
+export default function Riwayat() {
   const { logs, removeLogs } = useData()
   const { confirm, dialog } = useConfirm()
-  const canDelete = ROLES[role].remove // hanya PPIC yang boleh menghapus riwayat
+  const canDelete = true
   const [type, setType] = useState('all')
   const [sel, setSel] = useState([])
   const [msg, setMsg] = useState('')
