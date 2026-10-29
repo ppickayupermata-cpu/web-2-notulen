@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { susun, susunDokumen, gantiPeserta, parseIsi, teksBaris } from '../src/utils/isiNotulen.js'
+import { susun, susunDokumen, susunGabungan, gantiPeserta, parseIsi, teksBaris } from '../src/utils/isiNotulen.js'
 
 const items = [
   { so: '100', segs: ['1 ada di PACK, ( ket A )'], selesai: false }, { so: '200', segs: ['2 ada di FIN'], selesai: false },
@@ -26,4 +26,17 @@ test('gantiPeserta hanya mengubah daftar peserta', () => {
 test('bullet bertingkat, judul, teks bebas', () => {
   const b = parseIsi('*Judul\n• a\n  - b\nteks bebas')
   assert.deepEqual(b.map((x) => x.type + (x.lvl ?? '')), ['head', 'bullet0', 'bullet1', 'text'])
+})
+
+test('tata letak satu notulen rapat: tanpa baris kosong berlebih setelah Peserta, satu baris kosong sebelum catatan', () => {
+  const t = susunDokumen({ judul: 'NOTULEN X', hari: 'H', tempat: 'T', jam: 'J', hadir: [], items, heading: 'HEAD', note: 'N' }).split('\n')
+  assert.deepEqual(t.slice(0, 7), ['NOTULEN X', 'Hari,Tanggal : H', 'Tempat : T', 'Jam : J', 'Peserta :', '', '*HEAD'])
+  const p = susunDokumen({ judul: 'NOTULEN X', hari: 'H', tempat: 'T', jam: 'J', hadir: ['A ( X )'], items, heading: 'HEAD', note: 'N' }).split('\n')
+  assert.deepEqual(p.slice(4, 8), ['Peserta :', '• A ( X )', '', '*HEAD'])
+})
+test('notulen gabungan: dua baris kosong antar container, satu baris kosong antar SO di dalam container', () => {
+  const g = susunGabungan({ judul: 'NOTULEN X', hari: 'H', tempat: 'T', jam: 'J', hadir: [], note: 'N', sections: [{ heading: 'C1', items }, { heading: 'C2', items: [{ so: '9', segs: ['9 ada di FIN'] }] }, { heading: 'KOSONG', items: [] }] })
+  const t = g.split('\n'), a = t.indexOf('*C1'), b = t.indexOf('*C2')
+  assert.ok(a > 0 && b > a); assert.deepEqual(t.slice(b - 3, b), ['• 200, 9 ada di PACK', '', ''])   // 2 baris kosong sebelum container berikutnya
+  assert.ok(!g.includes('KOSONG')); assert.equal(t.at(-1), 'NOTE : N')
 })

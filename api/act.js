@@ -1,4 +1,4 @@
-import { randomUUID, snapshot, getSql, ensureDb, verifyToken, readBody, send, fail, clip, todayTZ, logQ } from './_lib.js'
+import { pastikanLive, randomUUID, snapshot, getSql, ensureDb, verifyToken, readBody, send, fail, clip, todayTZ, logQ } from './_lib.js'
 
 const STAGES = ['area', 'target', 'ket', 'kirim']
 const INFO = ['productCode', 'productName', 'po', 'so', 'soItem', 'material', 'type', 'size', 'qty', 'uom', 'group']
@@ -44,6 +44,14 @@ export default async function handler(req, res) {
       case 'cellHistory': { // riwayat satu sel: siapa mengubah apa dan kapan (untuk tombol Kembalikan)
         const h = await db`select old_v, new_v, by, at from cell_history where row_id = ${String(b.rowId)} and col = ${String(b.key)} order by at desc, id desc limit 30`
         return send(res, 200, { history: h.map((x) => ({ old: x.old_v ?? '', new: x.new_v ?? '', by: x.by, at: x.at })) })
+      }
+      case 'liveLink': { // ambil / buat link live container; rotate = ganti token (link lama langsung mati); enabled = nyalakan / matikan
+        const gid = String(b.groupId || ''), [g] = await db`select id from groups where id = ${gid}`
+        if (!g) return send(res, 404, { error: 'Container tidak ditemukan.' })
+        let l = await pastikanLive(db, gid)
+        if (b.rotate) { await db`update live_links set token = ${randomUUID().replace(/-/g, '').slice(0, 20)}, enabled = true where group_id = ${gid}`; l = (await db`select token, enabled from live_links where group_id = ${gid}`)[0] }
+        else if (typeof b.enabled === 'boolean') { await db`update live_links set enabled = ${b.enabled} where group_id = ${gid}`; l = (await db`select token, enabled from live_links where group_id = ${gid}`)[0] }
+        return send(res, 200, { token: l.token, enabled: l.enabled })
       }
       case 'snapshotNow': { await snapshot(db, 'manual', user.username); return send(res, 200, { ok: true }) }
       case 'dropSnapshot': { await db`delete from snapshots where id = ${String(b.id)}`; return send(res, 200, { ok: true }) }

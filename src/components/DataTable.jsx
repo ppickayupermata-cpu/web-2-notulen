@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { buildStyledXlsx } from '../utils/exportStyled.js'
-import { Columns3, Eye, EyeOff, PaintBucket, Baseline, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Merge, Eraser, RotateCcw, Download, ChevronUp, ChevronDown, Undo2, Redo2, Filter, Snowflake, Plus, Trash2, WrapText, NotebookPen, Ungroup, Search, Replace, AlarmClock, ArrowDownToLine, ArrowRightToLine, MoveHorizontal, X, PackageCheck, History, Printer, ChevronsUp, ChevronsDown, ChevronLeft, ChevronRight, AlertTriangle, CalendarClock } from 'lucide-react'
+import { Columns3, Eye, EyeOff, PaintBucket, Baseline, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Merge, Eraser, RotateCcw, Download, ChevronUp, ChevronDown, Undo2, Redo2, Filter, Snowflake, Plus, Trash2, WrapText, NotebookPen, Ungroup, Search, Replace, AlarmClock, ArrowDownToLine, ArrowRightToLine, MoveHorizontal, X, PackageCheck, Wrench, History, Printer, ChevronsUp, ChevronsDown, ChevronLeft, ChevronRight, AlertTriangle, CalendarClock } from 'lucide-react'
 import { ALL_COLS } from '../config.js'
 import { useData } from '../context/DataContext.jsx'
 import { useConfirm } from './ConfirmDialog.jsx'
 import { today } from '../utils/date.js'
 import { evaluate, XlErr } from '../utils/formula.js'
+import { parseGrid, normDate, petaPaste } from '../utils/pasteGrid.js'
 
 const isN = (x) => x !== '' && x != null && Number.isFinite(Number(x))
 const show = (c, v) => (c.type === 'date' && v && !String(v).startsWith('#') ? String(v).split('-').reverse().join('/') : v)
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch { return d } }
 
-export default function DataTable({ rows, editable = [], editing = false, getValue, onChange, selectable = false, selected = [], onToggle, onToggleAll, fileName, manage = false, groupId, onNotulen, onPack }) {
+export default function DataTable({ rows, editable = [], editing = false, getValue, onChange, selectable = false, selected = [], onToggle, onToggleAll, fileName, manage = false, groupId, onNotulen, onPack, compactTools = false, onChangeMany }) {
   const { settings, setSettings, addRows, removeRows, rows: allRows, cellHistory, applyChanges } = useData()
   const { confirm, dialog } = useConfirm()
   const extra = (settings.cols || []).map((c) => ({ ...c, type: 'text' }))
@@ -21,6 +22,7 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
   const [menu, setMenu] = useState(false)
   const [sel, setSel] = useState(null)
   const [drag, setDrag] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false), [pasteMsg, setPasteMsg] = useState('') // panel Edit cells (mode ringkas) + pesan hasil paste
   const [ed, setEd] = useState(null) // sel yang sedang diketik (mode edit seperti Excel): { id, key, orig }
   const [sort, setSort] = useState(null)
   const [flt, setFlt] = useState({}); const [showF, setShowF] = useState(false)
@@ -73,6 +75,8 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
 
   const rg = sel && { r0: Math.min(sel.a[0], sel.b[0]), r1: Math.max(sel.a[0], sel.b[0]), c0: Math.min(sel.a[1], sel.b[1]), c1: Math.max(sel.a[1], sel.b[1]) }
   const inR = (i, c) => rg && i >= rg.r0 && i <= rg.r1 && c >= rg.c0 && c <= rg.c1
+  // perubahan banyak sel sekaligus (paste, isi bawah, hapus, ganti semua) = SATU langkah Undo di halaman Input
+  const many = (list) => { if (!list.length) return; onChangeMany ? onChangeMany(list) : list.forEach((x) => onChange(x.id, x.key, x.v)) }
   const each = (fn) => { if (rg) for (let i = rg.r0; i <= rg.r1; i++) for (let c = rg.c0; c <= rg.c1; c++) if (vis[i] && cols[c]) fn(vis[i], cols[c]) }
   const pos = (m) => [vis.findIndex((r) => r.id === m.id), cols.findIndex((c) => c.key === m.key)]
 
@@ -92,20 +96,21 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
   const canUnmerge = !!rg && mg.some(hits)
   const unmergeSel = () => { if (canUnmerge) { save(); setMg(mg.filter((m) => !hits(m))) } } // Unmerge: lepas semua gabungan yang bersinggungan dengan seleksi (sel tertutup pun terdeteksi)
   const fill = (dir) => { // Ctrl+D isi bawah / Ctrl+R isi kanan: salin nilai dan format dari baris atau kolom pertama seleksi
-    if (!rg || !editing) return; save(); const fn = {}
+    if (!rg || !editing) return; save(); const fn = {}, ch = []
     for (let i = rg.r0; i <= rg.r1; i++) for (let c = rg.c0; c <= rg.c1; c++) {
       const si = dir === 'down' ? rg.r0 : i, sc = dir === 'down' ? c : rg.c0; if (si === i && sc === c) continue
       const s0 = vis[si], d = vis[i], col = cols[c]; if (!d || !s0 || !edt.includes(col.key)) continue
-      onChange(d.id, col.key, val(s0, cols[sc].key) ?? ''); fn[d.id + '|' + col.key] = fm[s0.id + '|' + cols[sc].key] || null
+      ch.push({ id: d.id, key: col.key, v: val(s0, cols[sc].key) ?? '' }); fn[d.id + '|' + col.key] = fm[s0.id + '|' + cols[sc].key] || null
     }
+    many(ch)
     setFm((f) => { const n = { ...f }; for (const [k, v] of Object.entries(fn)) v ? (n[k] = { ...v }) : delete n[k]; return n })
   }
-  const fillAll = (v) => { if (editing) each((r, c) => edt.includes(c.key) && onChange(r.id, c.key, v)) } // Ctrl+Enter / Ctrl+;
+  const fillAll = (v) => { if (!editing) return; const ch = []; each((r, c) => edt.includes(c.key) && ch.push({ id: r.id, key: c.key, v })); many(ch) } // Ctrl+Enter / Ctrl+;
   const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const fre = fnd?.q ? new RegExp(esc(fnd.q), fnd.cs ? '' : 'i') : null
   const fh = fre ? vis.flatMap((r, i) => cols.flatMap((c, ci) => (fre.test(String(calc(r, c.key) ?? '')) ? [{ i, ci, key: c.key }] : []))) : []
   const fcur = fh.length ? fh[((fnd.n % fh.length) + fh.length) % fh.length] : null, fset = new Set(fh.map((h) => h.i + ',' + h.ci))
-  const repl = (list) => { if (!editing) return; const re = new RegExp(esc(fnd.q), fnd.cs ? 'g' : 'gi'); list.forEach((h) => { if (edt.includes(h.key)) onChange(vis[h.i].id, h.key, String(val(vis[h.i], h.key) ?? '').replace(re, fnd.rep)) }) }
+  const repl = (list) => { if (!editing) return; const re = new RegExp(esc(fnd.q), fnd.cs ? 'g' : 'gi'); many(list.filter((h) => edt.includes(h.key)).map((h) => ({ id: vis[h.i].id, key: h.key, v: String(val(vis[h.i], h.key) ?? '').replace(re, fnd.rep) }))) }
   const st = rg && (() => { let n = 0, k = 0, sm = 0, mn = Infinity, mx = -Infinity; each((r, c) => { const v = calc(r, c.key); if (v === '' || v == null) return; n++; if (isN(v)) { const x = Number(v); k++; sm += x; mn = Math.min(mn, x); mx = Math.max(mx, x) } }); return { cells: (rg.r1 - rg.r0 + 1) * (rg.c1 - rg.c0 + 1), n, k, sm, mn, mx } })()
   const nf = (x) => Number(x.toFixed(3)).toLocaleString('id-ID')
   const todayS = today(), late = (r) => { const t = String(val(r, 'target') ?? ''); return warn && !!r && !r.packed && !!t && t < todayS && !String(val(r, 'kirim') ?? '').trim() }
@@ -182,18 +187,31 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
     const t = []; for (let i = rg.r0; i <= rg.r1; i++) t.push(cols.slice(rg.c0, rg.c1 + 1).map((c) => val(vis[i], c.key) ?? '').join('\t'))
     e.clipboardData.setData('text/plain', t.join('\n')); e.preventDefault()
   }
+  // Paste multi-sel ala Excel: data dari Excel / Google Sheets (tab + Enter) mengisi banyak sel sekaligus mulai dari sel terpilih,
+  // satu nilai ke banyak sel terpilih mengisi semuanya, kolom kalender otomatis membaca banyak penulisan tanggal.
   const onPaste = (e) => {
-    const tx = e.clipboardData.getData('text')
-    if (!editing || !rg || (!/[\t\n]/.test(tx.trim()) && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA'))) return
+    const tx = e.clipboardData.getData('text'), grid = parseGrid(tx)
+    const banyak = grid.length > 1 || grid.some((r) => r.length > 1), inField = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA'
+    if (!editing || !rg || !tx || (inField && !banyak)) return // satu nilai ke dalam kolom input yang sedang diketik = paste biasa
     e.preventDefault()
-    tx.replace(/\r/g, '').replace(/\n$/, '').split('\n').forEach((ln, a) => ln.split('\t').forEach((v, b) => { const r = vis[rg.r0 + a], c = cols[rg.c0 + b]; if (r && c && edt.includes(c.key)) onChange(r.id, c.key, v) }))
+    let bad = 0, skip = 0; const ch = []
+    for (const { i, c, v } of petaPaste(rg, grid)) {
+      const r = vis[i], col = cols[c]
+      if (!r || !col) continue
+      if (!edt.includes(col.key)) { skip++; continue }
+      let x = v
+      if (col.type === 'date') { x = normDate(v); if (v.trim() && !x) { bad++; continue } }
+      ch.push({ id: r.id, key: col.key, v: x })
+    }
+    many(ch)
+    setPasteMsg(`${ch.length} sel ditempel` + (bad ? ` · ${bad} tanggal tidak bisa dibaca (dilewati)` : '') + (skip ? ` · ${skip} sel di kolom yang tidak bisa diisi dilewati` : '')); setTimeout(() => setPasteMsg(''), 6000)
   }
   const onKey = (e) => {
     if (hot(e)) return
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo() }
     else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo() }
-    else if (editing && e.key === 'Delete') each((r, c) => edt.includes(c.key) && onChange(r.id, c.key, ''))
+    else if (editing && e.key === 'Delete') fillAll('')
     else if (rg && !e.ctrlKey && !e.metaKey && !e.altKey) {
       const arrow = e.key.startsWith('Arrow')
       const d = { ArrowDown: [1, 0], ArrowUp: [-1, 0], ArrowRight: [0, 1], ArrowLeft: [0, -1] }[e.key] || (e.key === 'Tab' && editing ? [0, e.shiftKey ? -1 : 1] : e.key === 'Enter' ? [e.shiftKey ? -1 : 1, 0] : null)
@@ -221,10 +239,8 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
   const kembalikan = async (e) => { if (!(await confirm({ title: 'Kembalikan nilai sel?', message: `Sel ${rh.col.label} diubah kembali menjadi "${show(rh.col, e.old) || '(kosong)'}".`, confirmLabel: 'Kembalikan' }))) return; await applyChanges({ [rh.row.id]: { [rh.col.key]: e.old } }); setRh(null) }
   const B = ({ t, d, f, children, cls = 'icon-btn dark' }) => <button className={cls} disabled={d} title={t} onClick={f}>{children}</button>
 
-  return (
+  const toolBtns = (
     <>
-      <div className="totalbar">
-        <div className="tools">
           <div className="pop">
             <button className="btn sm" onClick={() => setMenu((v) => !v)}><Columns3 size={15} /> Kolom</button>
             {menu && <div className="menu">
@@ -267,7 +283,16 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
           <B t="Unduh hasil sebagai Excel" f={exportXlsx} cls="btn sm primary"><Download size={15} /> Unduh Excel</B>
           <B t="Cetak tabel (atau simpan sebagai PDF lewat dialog cetak)" f={() => window.print()} cls="btn sm"><Printer size={15} /> Cetak</B>
           {onNotulen && <B t="Catat notulen dari tabel ini" f={() => onNotulen(calc)} cls="btn sm"><NotebookPen size={15} /> Catat Notulen</B>}
-        </div>
+    </>
+  )
+
+  return (
+    <>
+      <div className={'totalbar' + (compactTools ? ' compact' : '')}>
+        {compactTools ? <>
+          <div className="tools"><button className={'btn sm primary' + (toolsOpen ? ' on' : '')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)} title="Tampilkan / sembunyikan semua alat edit (warna, merge, kolom, cari, dst.)"><Wrench size={15} /> Edit cells <ChevronDown size={14} style={{ transform: toolsOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} /></button></div>
+          {toolsOpen && <div className="tools tools-panel">{toolBtns}</div>}
+        </> : <div className="tools">{toolBtns}</div>}
       </div>
       {fnd && <div className="findbar">
         <Search size={15} /><input autoFocus placeholder="Cari…" value={fnd.q} onChange={(e) => setFnd({ ...fnd, q: e.target.value, n: 0 })} onKeyDown={(e) => { if (e.key === 'Enter') setFnd({ ...fnd, n: fnd.n + (e.shiftKey ? -1 : 1) }); if (e.key === 'Escape') setFnd(null) }} />
@@ -276,7 +301,6 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
         <label className="inline" title="Peka huruf besar-kecil"><input type="checkbox" checked={fnd.cs} onChange={(e) => setFnd({ ...fnd, cs: e.target.checked })} /> Aa</label>
         {editing && <><Replace size={15} /><input placeholder="Ganti dengan…" value={fnd.rep} onChange={(e) => setFnd({ ...fnd, rep: e.target.value })} /><button className="btn sm" disabled={!fcur} onClick={() => repl([fcur])}>Ganti</button><button className="btn sm" disabled={!fh.length} onClick={() => repl(fh)}>Ganti semua</button></>}
         <button className="icon-btn dark" title="Tutup (Esc)" onClick={() => setFnd(null)}><X size={15} /></button></div>}
-      {st && st.n > 0 && <div className="statbar"><span>{st.cells} sel dipilih</span><span>Terisi: {st.n}</span>{st.k > 0 && <><span>Jumlah: <b>{nf(st.sm)}</b></span><span>Rata-rata: <b>{nf(st.sm / st.k)}</b></span><span>Min: {nf(st.mn)}</span><span>Maks: {nf(st.mx)}</span></>}</div>}
       <datalist id="dl-area">{areas.map((a) => <option key={a} value={a} />)}</datalist>
       {onNotulen && <div className="sumbar" aria-label="Ringkasan target">
         <span className="sc ok"><PackageCheck size={14} /> Dipacking {rows.length - un.length}/{rows.length}</span>
@@ -340,7 +364,7 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
                       const input = s.wrap ? <textarea {...props} rows={1} onKeyDown={(e) => editKey(e, i, ci, r, c, true)} /> : <input {...props} type={c.type === 'date' ? 'date' : 'text'} onKeyDown={(e) => editKey(e, i, ci, r, c, false)} />
                       const shown = show(c, calc(r, c.key))
                       return (
-                        <td key={c.key} data-rc={i + ',' + ci} className={(canEdit ? 'edit ' : '') + (isEd ? 'ing ' : '') + (inR(i, ci) ? 'rng ' : '') + (ci < fz ? 'frz' : '') + (fset.has(i + ',' + ci) ? ' hit' : '') + (fcur && fcur.i === i && fcur.ci === ci ? ' curhit' : '')} style={st} rowSpan={sp?.rs} colSpan={sp?.cs}
+                        <td key={c.key} data-rc={i + ',' + ci} data-k={c.key} className={(canEdit ? 'edit ' : '') + (isEd ? 'ing ' : '') + (inR(i, ci) ? 'rng ' : '') + (ci < fz ? 'frz' : '') + (fset.has(i + ',' + ci) ? ' hit' : '') + (fcur && fcur.i === i && fcur.ci === ci ? ' curhit' : '')} style={st} rowSpan={sp?.rs} colSpan={sp?.cs}
                           onMouseDown={(e) => { if (e.target.closest('input,textarea')) return; setSel(e.shiftKey && sel ? { a: sel.a, b: [i, ci] } : { a: [i, ci], b: [i, ci] }); setDrag(true) }}
                           onDoubleClick={() => { setDrag(false); startEdit(i, ci) }}
                           onMouseEnter={() => drag && setSel((x) => x && { ...x, b: [i, ci] })}>
@@ -356,6 +380,7 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
           </div>
         ))}
       </div>
+      <div className="statfoot" role="status" aria-live="polite">{pasteMsg ? <b>{pasteMsg}</b> : st && st.n > 0 ? <><span>{st.cells} sel dipilih</span><span>Terisi: {st.n}</span>{st.k > 0 && <><span>Jumlah: <b>{nf(st.sm)}</b></span><span>Rata-rata: <b>{nf(st.sm / st.k)}</b></span><span>Min: {nf(st.mn)}</span><span>Maks: {nf(st.mx)}</span></>}</> : <span>Pilih sel untuk melihat jumlah, rata-rata, dan lainnya.</span>}</div>
       {rh && <div className="overlay" onClick={() => setRh(null)}><div className="modal" role="dialog" aria-modal="true" aria-label="Riwayat sel" style={{ width: 'min(560px,94vw)' }} onClick={(e) => e.stopPropagation()}>
         <div className="toolbar"><h3 style={{ margin: 0 }}>Riwayat sel · {rh.col.label}</h3><span className="spacer" /><button className="icon-btn" aria-label="Tutup" onClick={() => setRh(null)}><X size={18} /></button></div>
         <p className="hint">SO {rh.row.so || '-'} · PO {rh.row.po || '-'} · {rh.row.productName}</p>

@@ -23,8 +23,18 @@ export function susun(items, heading) {
 
 // Satu halaman penuh: judul, keterangan meeting, peserta, catatan per SO, NOTE.
 export function susunDokumen({ judul, hari, tempat, jam, hadir, items, heading, note }) {
-  return [judul, `Hari,Tanggal : ${hari}`, `Tempat : ${tempat}`, `Jam : ${jam}`, 'Peserta :', '', ...hadir.map((h) => BUL + h), '', '', susun(items, heading), '', `NOTE : ${note}`].join('\n')
+  return [judul, `Hari,Tanggal : ${hari}`, `Tempat : ${tempat}`, `Jam : ${jam}`, 'Peserta :', ...hadir.map((h) => BUL + h), '', susun(items, heading), '', `NOTE : ${note}`].join('\n')
 }
+
+// Notulen GABUNGAN beberapa container: satu judul, satu keterangan, satu daftar peserta, lalu tiap container menjadi satu bagian
+// (judul container + daftar per SO). Antar container diberi DUA baris kosong supaya jelas terpisah; di dalam satu container tetap satu baris kosong antar SO.
+export function susunGabungan({ judul, hari, tempat, jam, hadir, sections, note }) {
+  const bagian = sections.filter((s) => s.items.length).map((s) => susun(s.items, s.heading))
+  return [judul, `Hari,Tanggal : ${hari}`, `Tempat : ${tempat}`, `Jam : ${jam}`, 'Peserta :', ...hadir.map((h) => BUL + h), '', bagian.join('\n\n\n'), '', `NOTE : ${note}`].join('\n')
+}
+
+// teks halaman -> teks siap tempel di WhatsApp (judul *tebal*, bullet tetap)
+export const keWA = (t) => String(t).split('\n').map((l) => { const h = l.match(/^\s*\*\s*(.+)$/); return h ? `*${h[1].trim()}*` : /^\s*NOTULEN\b/i.test(l) ? `*${l.trim()}*` : l }).join('\n')
 
 // Ganti daftar peserta di teks (mis. setelah ada yang absen lewat QR) tanpa mengubah bagian lain.
 export function gantiPeserta(text, hadir) {
@@ -33,7 +43,7 @@ export function gantiPeserta(text, hadir) {
   let j = i + 1, kosong = 0
   while (j < L.length) { const l = L[j]; if (!l.trim()) { if (++kosong >= 2) break } else if (/^\s*(•|-|–)\s/.test(l)) kosong = 0; else break; j++ }
   while (j > i + 1 && !L[j - 1].trim()) j--      // sisakan baris kosong penutup
-  return [...L.slice(0, i + 1), '', ...hadir.map((h) => BUL + h), ...L.slice(j)].join('\n')
+  return [...L.slice(0, i + 1), ...hadir.map((h) => BUL + h), ...L.slice(j)].join('\n')
 }
 
 // Teks -> blok { type: 'title'|'info'|'head'|'bullet'|'text'|'note'|'blank', ... }. done = teks baris yang sudah dipacking (diberi warna).

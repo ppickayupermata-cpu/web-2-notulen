@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import FilterBar, { GROUP_FIELDS, ITEM_FIELDS } from '../components/FilterBar.jsx'
 import GroupList from '../components/GroupList.jsx'
 import DataTable from '../components/DataTable.jsx'
@@ -7,7 +7,7 @@ import { useData } from '../context/DataContext.jsx'
 import { filterGroups, filterRows } from '../utils/filter.js'
 import { ALL_COLS } from '../config.js'
 import Notulen from '../components/Notulen.jsx'
-import { Undo2, Save, X, ArrowLeft, Pencil } from 'lucide-react'
+import { Undo2, Save, X, ArrowLeft } from 'lucide-react'
 
 const G0 = { container: '', buyer: '' }
 const I0 = { so: '', soItem: '', productCode: '' }
@@ -19,7 +19,7 @@ export default function InputData({ groupId, onBack }) {
   const [f, setF] = useState(G0)              // cari container & buyer (daftar)
   const [fi, setFi] = useState(I0)            // cari SO, SO item, product code (di dalam container)
   const [openId, setOpenId] = useState(groupId || null)
-  const [editing, setEditing] = useState(false)
+  const editing = true // langsung bisa diisi: tidak ada tombol Edit lagi
   const [draft, setDraft] = useState({})      // { idBaris: { kolom: nilai } }
   const [history, setHistory] = useState([])  // tumpukan draft sebelumnya untuk Undo
   const [msg, setMsg] = useState('')
@@ -35,12 +35,18 @@ export default function InputData({ groupId, onBack }) {
     setDraft((d) => ({ ...d, [id]: { ...d[id], [k]: v } }))
     setMsg('')
   }
+  const changeMany = (list) => { // banyak sel sekaligus (paste, isi bawah, hapus) = satu langkah Undo
+    if (!list.length) return
+    setHistory((h) => [...h, draft])
+    setDraft((d) => { const n = { ...d }; for (const { id, key, v } of list) n[id] = { ...n[id], [key]: v }; return n })
+    setMsg('')
+  }
   const undo = () => {
     if (!history.length) return
     setDraft(history[history.length - 1])
     setHistory((h) => h.slice(0, -1))
   }
-  const reset = () => { setDraft({}); setHistory([]); setEditing(false) }
+  const reset = () => { setDraft({}); setHistory([]) }
   const submit = async () => {
     if (!changed) return
     const n = changed
@@ -59,33 +65,30 @@ export default function InputData({ groupId, onBack }) {
     reset(); onBack ? onBack() : setOpenId(null); setFi(I0); setMsg('')
   }
 
+  // satu halaman penuh tanpa scroll halaman: hanya tabel yang bisa digulir
+  const penuh = !!open
+  useEffect(() => { const c = document.querySelector('.content'); if (!penuh || !c) return; c.classList.add('fill'); return () => c.classList.remove('fill') }, [penuh])
+
   // ---- Isi satu container: edit di sini ----
   if (open) {
     const shown = filterRows(rows.filter((r) => r.groupId === open.id), fi)
     return (
-      <>
-        <div className="toolbar">
+      <div className="fillpage">
+        <div className="toolbar wrap">
           <button className="btn" onClick={back}><ArrowLeft size={15} /> Kembali</button>
-          <h2 style={{ margin: 0 }}>Input Data · Container {open.container} <small>Buyer {open.buyer || '-'} · kolom yang bisa diisi: {editable.join(', ').toUpperCase()}</small></h2>
+          <h2 style={{ margin: 0 }}>Input Data · Container {open.container} <small>Buyer {open.buyer || '-'}</small></h2>
+          <span className="spacer" />
+          <button className="btn" onClick={undo} disabled={!history.length}><Undo2 size={15} /> Undo</button>
+          <button className="btn primary" onClick={submit} disabled={!changed}><Save size={15} /> Submit ({changed})</button>
+          <button className="btn" onClick={cancel} disabled={!changed}><X size={15} /> Batal</button>
+          {msg && <span className="msg ok">{msg}</span>}
         </div>
         <FilterBar fields={ITEM_FIELDS} value={fi} onChange={setFi} onClear={() => setFi(I0)} />
-        <div className="toolbar">
-          {!editing ? (
-            <button className="btn primary" disabled={!shown.length} onClick={() => setEditing(true)}><Pencil size={15} /> Edit</button>
-          ) : (
-            <>
-              <button className="btn" onClick={undo} disabled={!history.length}><Undo2 size={15} /> Undo</button>
-              <button className="btn primary" onClick={submit} disabled={!changed}><Save size={15} /> Submit ({changed})</button>
-              <button className="btn" onClick={cancel}><X size={15} /> Batal</button>
-            </>
-          )}
-          {msg && <span className="msg ok">{msg}</span>}
-          {editing && <span className="hint">Klik sel untuk memilih; klik 2x (atau F2 / langsung ketik) untuk mengisi sel kuning. Enter / Tab menyimpan dan pindah sel, Esc membatalkan. Setelah selesai klik Submit.</span>}
-        </div>
-        <DataTable fileName={`Container-${open.container}`} rows={shown} manage groupId={open.id} editable={editable} editing={editing} getValue={getValue} onChange={change} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={(r) => applyChanges({ [r.id]: { packed: r.packed ? '' : '1' } })} />
+        <div className="hint" style={{ margin: '2px 0' }}>Klik sel untuk memilih; klik 2x (atau F2 / langsung ketik) untuk mengisi sel kuning. Enter / Tab menyimpan dan pindah sel, Esc membatalkan. Bisa paste banyak sel dari Excel. Setelah selesai klik Submit.</div>
+        <DataTable fileName={`Container-${open.container}`} rows={shown} manage groupId={open.id} editable={editable} editing={editing} compactTools getValue={getValue} onChange={change} onChangeMany={changeMany} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={(r) => applyChanges({ [r.id]: { packed: r.packed ? '' : '1' } })} />
         {nt && <Notulen calc={calcRef.current} group={open} rows={rows.filter((r) => r.groupId === open.id)} onClose={() => setNt(false)} />}
         {dialog}
-      </>
+      </div>
     )
   }
 

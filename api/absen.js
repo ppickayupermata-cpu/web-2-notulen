@@ -1,15 +1,18 @@
-import { randomUUID, getSql, ensureDb, verifyToken, readBody, send, fail, clip } from './_lib.js'
+import { pastikanLive, randomUUID, getSql, ensureDb, verifyToken, readBody, send, fail, clip } from './_lib.js'
 
 // Absensi lewat QR. Yang PUBLIK (tanpa login): melihat room (GET ?room=) dan mengirim absen (POST action=submit).
 // Yang butuh login PPIC: membuat room, menutup/membuka, menghapus entri. Waktu absen = jam server saat Submit diklik.
 const bersih = (v, n) => clip(String(v ?? '').replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim(), n)
 const MAKS = 400 // batas entri per room (mencegah penyalahgunaan link publik)
 
-async function paket(db, roomId) {
-  const [room] = await db`select id, title, closed from absen_rooms where id = ${roomId}`
+async function paket(db, roomId, entryId = '') {
+  const [room] = await db`select id, title, closed, group_id from absen_rooms where id = ${roomId}`
   if (!room) return null
-  const [log, [t]] = await Promise.all([db`select id, nama, bagian, at from absen_log where room_id = ${roomId} order by seq`, db`select now() as now`])
-  return { room: { id: room.id, title: room.title, closed: !!room.closed }, log: log.map((x) => ({ id: x.id, nama: x.nama, bagian: x.bagian, at: new Date(x.at).toISOString() })), now: new Date(t.now).toISOString() }
+  const [log, [t]] = await Promise.all([db`select id, nama, bagian, at, confirmed from absen_log where room_id = ${roomId} order by seq`, db`select now() as now`])
+  const mine = entryId && log.find((x) => x.id === entryId)
+  let live = null // tombol "Lihat live" di HP peserta hanya muncul setelah absennya dikonfirmasi admin
+  if (mine?.confirmed && room.group_id) { const [l] = await db`select token, enabled from live_links where group_id = ${room.group_id}`; if (l?.enabled) live = l.token }
+  return { room: { id: room.id, title: room.title, closed: !!room.closed }, log: log.map((x) => ({ id: x.id, nama: x.nama, bagian: x.bagian, at: new Date(x.at).toISOString(), confirmed: !!x.confirmed })), now: new Date(t.now).toISOString(), ...(mine ? { mine: { id: mine.id, confirmed: !!mine.confirmed } } : {}), ...(live ? { live } : {}) }
 }
 
 export default async function handler(req, res) {
@@ -23,7 +26,7 @@ export default async function handler(req, res) {
         const [r] = await db`select id from absen_rooms where group_id = ${String(q.get('groupId') || '')} order by created_at desc limit 1`
         return send(res, 200, r ? await paket(db, r.id) : { room: null, log: [] })
       }
-      const p = await paket(db, clip(id, 40))
+      const p = await paket(db, clip(id, 40), clip(q.get('entry'), 60))
       return p ? send(res, 200, p) : send(res, 404, { error: 'Room absensi tidak ditemukan.' })
     }
     if (req.method !== 'POST') return send(res, 405, { error: 'Method tidak diizinkan.' })
@@ -45,7 +48,7 @@ export default async function handler(req, res) {
         await db`insert into absen_log(id, room_id, nama, bagian, k) values (${randomUUID()}, ${id}, ${nama}, ${bagian}, ${k}) on conflict (room_id, k) do nothing`
         ;[e] = await ada()
       }
-      const p = await paket(db, id)
+      const p = await paket(db, id, e.id)
       return send(res, 200, { ok: true, dup, entry: { id: e.id, nama: e.nama, bagian: e.bagian, at: new Date(e.at).toISOString() }, ...p })
     }
 
@@ -65,6 +68,20 @@ export default async function handler(req, res) {
       case 'setClosed': {
         await db`update absen_rooms set closed = ${!!b.closed} where id = ${clip(b.room, 40)}`
         const p = await paket(db, clip(b.room, 40)); return p ? send(res, 200, p) : send(res, 404, { error: 'Room tidak ditemukan.' })
+      }
+      case 'confirm': { // konfirmasi (atau batalkan konfirmasi) satu absen; ikut membuat link live container bila belum ada
+        const room = clip(b.room, 40), [r] = await db`select group_id from absen_rooms where id = ${room}`
+        if (!r) return send(res, 404, { error: 'Room tidak ditemukan.' })
+        await db`update absen_log set confirmed = ${!!b.confirmed}, confirmed_at = ${b.confirmed ? new Date().toISOString() : null} where id = ${clip(b.id, 60)} and room_id = ${room}`
+        if (b.confirmed && r.group_id) await pastikanLive(db, r.group_id)
+        return send(res, 200, await paket(db, room))
+      }
+      case 'confirmAll': {
+        const room = clip(b.room, 40), [r] = await db`select group_id from absen_rooms where id = ${room}`
+        if (!r) return send(res, 404, { error: 'Room tidak ditemukan.' })
+        await db`update absen_log set confirmed = true, confirmed_at = now() where room_id = ${room} and not confirmed`
+        if (r.group_id) await pastikanLive(db, r.group_id)
+        return send(res, 200, await paket(db, room))
       }
       case 'remove': {
         await db`delete from absen_log where id = ${clip(b.id, 60)} and room_id = ${clip(b.room, 40)}`

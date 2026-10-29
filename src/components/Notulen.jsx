@@ -45,7 +45,7 @@ export default function Notulen({ group, rows, calc, onClose }) {
   // ---------- isi notulen ----------
   // nilai sel yang berisi rumus (=...) dihitung dulu, supaya yang masuk notulen adalah hasilnya, bukan teks rumus
   const tabel = dariTabel(calc ? rows.map((r) => ({ ...r, area: calc(r, 'area'), target: calc(r, 'target'), ket: calc(r, 'ket') })) : rows)
-  const hadir = [...new Map([...log.map((e) => `${e.nama} ( ${e.bagian} )`), ...manual.filter((p) => p.hadir).map(lbl)].map((x) => [x.toLowerCase(), x])).values()]
+  const hadir = [...new Map([...log.filter((e) => e.confirmed).map((e) => `${e.nama} ( ${e.bagian} )`), ...manual.filter((p) => p.hadir).map(lbl)].map((x) => [x.toLowerCase(), x])).values()]
   const prefix = init.prefix ?? `${group.container}${group.buyer ? ' ' + group.buyer : ''}`.trim(), tglKirim = init.tglKirim ?? (group.shipDate || '')
   const heading = [prefix, tglKirim ? 'RENCANA KIRIM ' + tglID(tglKirim).toUpperCase() : 'RENCANA KIRIM'].filter(Boolean).join(' ')
   const auto = susunDokumen({ judul: 'NOTULEN ' + info.nama.toUpperCase(), hari: tgl(info.tanggal), tempat: 'Ruang Meeting ' + (info.ruang || '-'), jam: `${jam(info.mulai)} WIB s/d ${jam(info.selesai)}`, hadir, items: tabel.items, heading, note: NOTE_DEFAULT })
@@ -90,9 +90,10 @@ export default function Notulen({ group, rows, calc, onClose }) {
                     <button className="btn sm" onClick={() => kirim({ action: 'setClosed', room: roomId, closed: !room.closed })}>{room.closed ? <><Unlock size={14} /> Buka absensi</> : <><Lock size={14} /> Tutup absensi</>}</button>
                     <button className="btn sm" onClick={() => window.confirm('Buat QR baru? Log absensi lama tetap tersimpan, tetapi QR lama tidak dipakai lagi di sini.') && buat(true)}><QrCode size={14} /> QR baru</button></div>
                   <span className={'chip-st ' + (room.closed ? 'tutup' : 'buka')}>{room.closed ? 'Absensi ditutup' : 'Absensi dibuka'}</span></div></div>
-              <div className="tw"><table className="logtbl"><thead><tr><th>#</th><th>Nama</th><th>Bagian</th><th>Waktu absen</th><th /></tr></thead>
-                <tbody>{log.length === 0 && <tr><td colSpan="5" className="hint">Belum ada yang absen.</td></tr>}
-                  {log.map((l, i) => <tr key={l.id}><td>{i + 1}</td><td>{l.nama}</td><td>{l.bagian}</td><td className="wkt">{jamStr(l.at)}<small> {tglPendek(l.at)}</small></td><td><button className="icon-btn" title="Hapus entri" onClick={() => kirim({ action: 'remove', room: roomId, id: l.id })}><Trash2 size={14} /></button></td></tr>)}</tbody></table></div>
+              <p className="hint">Hanya peserta yang <b>sudah dikonfirmasi</b> masuk ke notulen (atau pakai tombol <b>Pantau absensi</b> di daftar Monitoring). {log.some((l) => !l.confirmed) && <button className="btn sm" onClick={() => kirim({ action: 'confirmAll', room: roomId })}>Konfirmasi semua</button>}</p>
+              <div className="tw"><table className="logtbl"><thead><tr><th>#</th><th>Nama</th><th>Bagian</th><th>Waktu absen</th><th>Status</th><th /></tr></thead>
+                <tbody>{log.length === 0 && <tr><td colSpan="6" className="hint">Belum ada yang absen.</td></tr>}
+                  {log.map((l, i) => <tr key={l.id}><td>{i + 1}</td><td>{l.nama}</td><td>{l.bagian}</td><td className="wkt">{jamStr(l.at)}<small> {tglPendek(l.at)}</small></td><td>{l.confirmed ? <span className="chip-st buka" style={{ margin: 0 }}>Terkonfirmasi</span> : <button className="btn sm primary" onClick={() => kirim({ action: 'confirm', room: roomId, id: l.id, confirmed: true })}>Konfirmasi</button>}</td><td><button className="icon-btn" title="Hapus entri" onClick={() => kirim({ action: 'remove', room: roomId, id: l.id })}><Trash2 size={14} /></button></td></tr>)}</tbody></table></div>
             </div>)}
           {err && <div className="msg err">{err}</div>}
           <details style={{ marginTop: 10 }}><summary>Absen manual (tanpa QR)</summary>

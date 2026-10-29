@@ -31,6 +31,7 @@ export function ensureDb() {
           type text, actor text, detail text)`,
       db`create table if not exists settings (key text primary key, value jsonb not null)`,
       db`create table if not exists backups (seq bigserial, id text primary key, container text not null, at timestamptz not null default now(), by text, n int not null default 0, payload jsonb not null)`,
+      db`create table if not exists live_links (group_id text primary key references groups(id) on delete cascade, token text not null unique, enabled boolean not null default true, created_at timestamptz not null default now())`,
       db`create table if not exists snapshots (seq bigserial, id text primary key, at timestamptz not null default now(), kind text not null, by text, n_groups int not null default 0, n_rows int not null default 0, payload jsonb not null)`,
       db`create table if not exists cell_history (id bigserial primary key, row_id text not null, col text not null, old_v text, new_v text, by text, at timestamptz not null default now())`,
       db`create index if not exists cell_history_idx on cell_history(row_id, col, at desc)`,
@@ -38,6 +39,8 @@ export function ensureDb() {
           title text default '', created_by text, created_at timestamptz not null default now(), closed boolean not null default false)`,
       db`create table if not exists absen_log (seq bigserial, id text primary key, room_id text not null references absen_rooms(id) on delete cascade,
           nama text not null, bagian text not null, k text not null, at timestamptz not null default now(), unique (room_id, k))`,
+      db`alter table absen_log add column if not exists confirmed boolean not null default false`,
+      db`alter table absen_log add column if not exists confirmed_at timestamptz`,
     ]).catch((e) => { ready = null; throw e })
   }
   return ready
@@ -104,6 +107,16 @@ export async function loadAll() {
     snapshots: sn.map((x) => ({ id: x.id, at: x.at, kind: x.kind, by: x.by, groups: x.n_groups, rows: x.n_rows })), // cadangan penuh database (isi tidak ikut dikirim)
     // cadangan sebelum "Ganti semua" (isi tidak ikut dikirim)
   }
+}
+
+// token live read-only untuk satu container; dibuat bila belum ada (dipakai saat admin mengkonfirmasi absen)
+export async function pastikanLive(db, groupId) {
+  const [l] = await db`select token, enabled from live_links where group_id = ${groupId}`
+  if (l) return l
+  const token = randomUUID().replace(/-/g, '').slice(0, 20)
+  await db`insert into live_links(group_id, token) values (${groupId}, ${token}) on conflict (group_id) do nothing`
+  const [n] = await db`select token, enabled from live_links where group_id = ${groupId}`
+  return n
 }
 
 // ---------- cadangan penuh (snapshot) ----------

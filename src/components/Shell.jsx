@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Menu, LogOut, Maximize, Minimize, Sun, Moon, Search, Keyboard, WifiOff, Check, Loader2 } from 'lucide-react'
 import CariGlobal from './CariGlobal.jsx'
 import Pintasan from './Pintasan.jsx'
+import FsFab from './FsFab.jsx'
 import { useUi } from '../context/UiContext.jsx'
 import Sidebar from './Sidebar.jsx'
 import Monitoring from '../pages/Monitoring.jsx'
@@ -48,14 +49,12 @@ export default function Shell({ user, onLogout }) {
         <span>{user.username}</span>
         <button className="btn ghost" onClick={onLogout}><LogOut size={15} /> Keluar</button>
       </header>
-      {fs && (
-        <div className="fsbar">
-          <button className={'icon-btn' + (navFs ? ' on' : '')} onClick={() => setNavFs((v) => !v)} title="Menu" aria-label="Menu" aria-expanded={navFs}><Menu size={18} /></button>
-          <button className={'icon-btn' + (showFilter ? ' on' : '')} onClick={() => setShowFilter((v) => !v)} title="Tampilkan / sembunyikan pencarian"><Search size={18} /></button>
-          <button className="icon-btn" onClick={toggleTheme} title="Tema terang / gelap"><ThemeIcon size={18} /></button>
-          <button className="icon-btn" onClick={toggleFs} title="Keluar layar penuh (Esc)"><Minimize size={18} /></button>
-        </div>
-      )}
+      {fs && <FsFab items={[
+        { key: 'menu', label: 'Menu', icon: <Menu size={18} />, active: navFs, onClick: () => setNavFs((v) => !v) },
+        { key: 'cari', label: 'Tampilkan / sembunyikan pencarian', icon: <Search size={18} />, active: showFilter, onClick: () => setShowFilter((v) => !v), keep: true },
+        { key: 'tema', label: 'Tema terang / gelap', icon: <ThemeIcon size={18} />, onClick: toggleTheme, keep: true },
+        { key: 'keluar', label: 'Keluar layar penuh (Esc)', icon: <Minimize size={18} />, onClick: toggleFs },
+      ]} />}
       {fs && navFs && <div className="fs-backdrop" onClick={() => setNavFs(false)} />}
       <div className="body">
         <Sidebar page={page} setPage={(p) => { setPage(p); if (fs) setNavFs(false) }} open={fs ? navFs : nav} />

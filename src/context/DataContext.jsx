@@ -107,7 +107,7 @@ export function DataProvider({ token, onUnauthorized, children }) {
 
   return (
     <Ctx.Provider value={{
-      ...db, token, loading, error, clearError: () => setError(''), refresh, saving, lastSaved, notice, clearNotice: () => setNotice(''),
+      ...db, token, loading, error, clearError: () => setError(''), refresh, ask, saving, lastSaved, notice, clearNotice: () => setNotice(''),
       applyChanges, updateGroup, addRows, mergeRows, restoreBackup, dropBackup, cellHistory, snapshotNow, dropSnapshot, restoreSnapshot, addGroup, removeGroup, removeRows, addSchedules, removeSchedule, setSettings, removeLogs,
     }}>
       {children}
