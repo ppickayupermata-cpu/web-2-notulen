@@ -7,6 +7,15 @@
 //   "NOTE : .." = catatan merah; baris kosong = jarak; selain itu = paragraf biasa
 export const BUL = '• '
 
+// Ringkasan per AREA di bagian bawah notulen (di atas NOTE): "AREA PC" lalu bullet semua catatan di area itu, dst.
+// Penulisan AREA tidak peka huruf besar/kecil (PC = pc = Pc). Urutan AREA mengikuti kemunculan pertama di tabel; yang tanpa AREA di paling akhir.
+export function ringkasArea(rincian = []) {
+  const m = new Map()
+  for (const e of rincian) { const a = String(e.area || '').trim().replace(/\s+/g, ' ').toUpperCase(); m.set(a, [...(m.get(a) || []), e]) }
+  const urut = [...m].sort((x, y) => (x[0] === '') - (y[0] === ''))
+  return urut.map(([a, list]) => [a ? 'AREA ' + a : 'TANPA AREA', ...list.map((e) => BUL + [e.so, e.po].filter(Boolean).join(', ') + (e.tg ? ` target selesai ${e.tg}` : '') + (e.kets?.length ? `, ( ${e.kets.join('; ')} )` : '') + (e.container ? ` · ${e.container}` : ''))].join('\n')).join('\n\n')
+}
+
 // Satu SO = satu daftar: baris pertama "• SO, catatan" (bullet tingkat 1), catatan berikutnya di SO yang sama "  • catatan" (tingkat 2).
 const barisSO = (list) => {
   const m = new Map(); list.forEach((i) => m.set(i.so || '', [...(m.get(i.so || '') || []), i]))
@@ -22,15 +31,16 @@ export function susun(items, heading) {
 }
 
 // Satu halaman penuh: judul, keterangan meeting, peserta, catatan per SO, NOTE.
-export function susunDokumen({ judul, hari, tempat, jam, hadir, items, heading, note }) {
-  return [judul, `Hari,Tanggal : ${hari}`, `Tempat : ${tempat}`, `Jam : ${jam}`, 'Peserta :', ...hadir.map((h) => BUL + h), '', susun(items, heading), '', `NOTE : ${note}`].join('\n')
+export function susunDokumen({ judul, hari, tempat, jam, hadir, items, heading, note, rincian = [] }) {
+  const rs = ringkasArea(rincian)
+  return [judul, `Hari,Tanggal : ${hari}`, `Tempat : ${tempat}`, `Jam : ${jam}`, 'Peserta :', ...hadir.map((h) => BUL + h), '', susun(items, heading), ...(rs ? ['', rs] : []), '', `NOTE : ${note}`].join('\n')
 }
 
 // Notulen GABUNGAN beberapa container: satu judul, satu keterangan, satu daftar peserta, lalu tiap container menjadi satu bagian
 // (judul container + daftar per SO). Antar container diberi DUA baris kosong supaya jelas terpisah; di dalam satu container tetap satu baris kosong antar SO.
-export function susunGabungan({ judul, hari, tempat, jam, hadir, sections, note }) {
-  const bagian = sections.filter((s) => s.items.length).map((s) => susun(s.items, s.heading))
-  return [judul, `Hari,Tanggal : ${hari}`, `Tempat : ${tempat}`, `Jam : ${jam}`, 'Peserta :', ...hadir.map((h) => BUL + h), '', bagian.join('\n\n\n'), '', `NOTE : ${note}`].join('\n')
+export function susunGabungan({ judul, hari, tempat, jam, hadir, sections, note, rincian = [] }) {
+  const bagian = sections.filter((s) => s.items.length).map((s) => susun(s.items, s.heading)), rs = ringkasArea(rincian)
+  return [judul, `Hari,Tanggal : ${hari}`, `Tempat : ${tempat}`, `Jam : ${jam}`, 'Peserta :', ...hadir.map((h) => BUL + h), '', bagian.join('\n\n\n'), ...(rs ? ['', '', rs] : []), '', `NOTE : ${note}`].join('\n')
 }
 
 // teks halaman -> teks siap tempel di WhatsApp (judul *tebal*, bullet tetap)

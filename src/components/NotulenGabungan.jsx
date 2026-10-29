@@ -33,7 +33,7 @@ export default function NotulenGabungan({ groups, rows, onClose }) {
   const hadirDari = (a, m) => { const u = new Map(); [...a, ...m.map((p) => `${p.n} ( ${p.d} )`)].forEach((x) => { if (!u.has(x.toLowerCase())) u.set(x.toLowerCase(), x) }); return [...u.values()] } // tanpa dobel; penulisan pertama dipakai
   const hadir = hadirDari(absen, manual)
   const sections = terpilih.map((g) => ({ heading: [`${g.container}${g.buyer ? ' ' + g.buyer : ''}`.trim(), g.shipDate ? 'RENCANA KIRIM ' + tglID(g.shipDate).toUpperCase() : 'RENCANA KIRIM'].join(' '), items: info0.get(g.id).items }))
-  const auto = susunGabungan({ judul: 'NOTULEN ' + info.nama.toUpperCase(), hari: tgl(info.tanggal), tempat: 'Ruang Meeting ' + (info.ruang || '-'), jam: `${jam(info.mulai)} WIB s/d ${jam(info.selesai)}`, hadir, sections, note: NOTE_DEFAULT })
+  const auto = susunGabungan({ judul: 'NOTULEN ' + info.nama.toUpperCase(), hari: tgl(info.tanggal), tempat: 'Ruang Meeting ' + (info.ruang || '-'), jam: `${jam(info.mulai)} WIB s/d ${jam(info.selesai)}`, hadir, sections, rincian: terpilih.flatMap((g) => info0.get(g.id).rincian.map((r) => ({ ...r, container: g.container }))), note: NOTE_DEFAULT })
   const text = isi ?? auto
   const done = new Set(terpilih.flatMap((g) => teksBaris(info0.get(g.id).items.filter((i) => i.selesai))))
   const nCatatan = terpilih.reduce((n, g) => n + info0.get(g.id).items.length, 0)

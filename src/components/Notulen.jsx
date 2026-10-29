@@ -48,7 +48,7 @@ export default function Notulen({ group, rows, calc, onClose }) {
   const hadir = [...new Map([...log.filter((e) => e.confirmed).map((e) => `${e.nama} ( ${e.bagian} )`), ...manual.filter((p) => p.hadir).map(lbl)].map((x) => [x.toLowerCase(), x])).values()]
   const prefix = init.prefix ?? `${group.container}${group.buyer ? ' ' + group.buyer : ''}`.trim(), tglKirim = init.tglKirim ?? (group.shipDate || '')
   const heading = [prefix, tglKirim ? 'RENCANA KIRIM ' + tglID(tglKirim).toUpperCase() : 'RENCANA KIRIM'].filter(Boolean).join(' ')
-  const auto = susunDokumen({ judul: 'NOTULEN ' + info.nama.toUpperCase(), hari: tgl(info.tanggal), tempat: 'Ruang Meeting ' + (info.ruang || '-'), jam: `${jam(info.mulai)} WIB s/d ${jam(info.selesai)}`, hadir, items: tabel.items, heading, note: NOTE_DEFAULT })
+  const auto = susunDokumen({ judul: 'NOTULEN ' + info.nama.toUpperCase(), hari: tgl(info.tanggal), tempat: 'Ruang Meeting ' + (info.ruang || '-'), jam: `${jam(info.mulai)} WIB s/d ${jam(info.selesai)}`, hadir, items: tabel.items, rincian: tabel.rincian, heading, note: NOTE_DEFAULT })
   const text = isi ?? auto, edited = isi !== null && isi !== auto
   const done = new Set(teksBaris(tabel.items.filter((i) => i.selesai))) // baris sudah dipacking tetap diberi warna di Word selama teksnya tidak diubah
   // riwayat versi: tiap kali diunduh / disimpan manual, teks halaman dicatat (15 terakhir, di browser ini)

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { susun, susunDokumen, susunGabungan, gantiPeserta, parseIsi, teksBaris } from '../src/utils/isiNotulen.js'
+import { susun, susunDokumen, susunGabungan, gantiPeserta, parseIsi, teksBaris, ringkasArea } from '../src/utils/isiNotulen.js'
 
 const items = [
   { so: '100', segs: ['1 ada di PACK, ( ket A )'], selesai: false }, { so: '200', segs: ['2 ada di FIN'], selesai: false },
@@ -40,3 +40,16 @@ test('notulen gabungan: dua baris kosong antar container, satu baris kosong anta
   assert.ok(a > 0 && b > a); assert.deepEqual(t.slice(b - 3, b), ['• 200, 9 ada di PACK', '', ''])   // 2 baris kosong sebelum container berikutnya
   assert.ok(!g.includes('KOSONG')); assert.equal(t.at(-1), 'NOTE : N')
 })
+
+test('ringkasan per AREA: tidak peka huruf besar/kecil, urutan kemunculan, bullet per catatan', () => {
+  const t = ringkasArea([
+    { area: 'pc', so: '1', po: 'P1', tg: '25 oktober 2026', kets: ['kaca'] }, { area: 'WC', so: '1', po: 'P2', tg: '26 oktober 2026', kets: [] },
+    { area: 'Pc', so: '2', po: 'P3', tg: '', kets: [] }, { area: '', so: '3', po: 'P4', tg: '', kets: [] }]).split('\n')
+  assert.deepEqual(t, ['AREA PC', '• 1, P1 target selesai 25 oktober 2026, ( kaca )', '• 2, P3', '', 'AREA WC', '• 1, P2 target selesai 26 oktober 2026', '', 'TANPA AREA', '• 3, P4'])
+})
+test('ringkasan berada di bawah daftar, tepat di atas NOTE', () => {
+  const t = susunDokumen({ judul: 'N', hari: 'H', tempat: 'T', jam: 'J', hadir: [], items, heading: 'HEAD', note: 'CATATAN', rincian: [{ area: 'pc', so: '1', po: 'P1', tg: '', kets: [] }] }).split('\n')
+  assert.deepEqual(t.slice(-5), ['', 'AREA PC', '• 1, P1', '', 'NOTE : CATATAN'])
+  assert.ok(t.indexOf('AREA PC') > t.indexOf('• 200, 9 ada di PACK'))
+})
+test('tanpa rincian: tidak ada ringkasan', () => { assert.ok(!susunDokumen({ judul: 'N', hari: 'H', tempat: 'T', jam: 'J', hadir: [], items, heading: 'H', note: 'N' }).includes('AREA ')) })
