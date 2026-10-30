@@ -7,13 +7,13 @@ import { useData } from '../context/DataContext.jsx'
 import { filterGroups, filterRows } from '../utils/filter.js'
 import { ALL_COLS } from '../config.js'
 import Notulen from '../components/Notulen.jsx'
-import { Undo2, Save, X, ArrowLeft } from 'lucide-react'
+import { Undo2, Save, X, ArrowLeft, Filter } from 'lucide-react'
 
 const G0 = { container: '', buyer: '' }
 const I0 = { so: '', soItem: '', productCode: '' }
 
 export default function InputData({ groupId, onBack }) {
-  const { rows, groups, applyChanges } = useData()
+  const { rows, groups, applyChanges, ask } = useData()
   const editable = ALL_COLS.map((c) => c.key)
   const { confirm, dialog } = useConfirm()
   const [f, setF] = useState(G0)              // cari container & buyer (daftar)
@@ -24,9 +24,17 @@ export default function InputData({ groupId, onBack }) {
   const [history, setHistory] = useState([])  // tumpukan draft sebelumnya untuk Undo
   const [msg, setMsg] = useState('')
   const [nt, setNt] = useState(false)
+  const [showFilter, setShowFilter] = useState(() => { try { return localStorage.getItem('pl_ui_filter') === '1' } catch { return false } }) // kotak filter bisa disembunyikan agar tabel lebih luas
+  useEffect(() => { try { localStorage.setItem('pl_ui_filter', showFilter ? '1' : '0') } catch { /* mode privat */ } }, [showFilter])
   const calcRef = useRef(null) // fungsi hitung rumus dari tabel, dipakai notulen
 
   const open = groups.find((g) => g.id === openId)
+  // Live: kursor admin + isian yang BELUM di-Submit dikirim (tertunda 0,35 dtk, denyut 6 dtk) agar tampilan live menunjukkannya langsung
+  const [cursor, setCursor] = useState(null), pres = useRef({})
+  pres.current = { groupId: openId, rowId: cursor?.rowId, key: cursor?.key, editing: !!cursor?.editing, draft }
+  const kirimPres = () => { if (pres.current.groupId) ask('livePresence', pres.current, true) }
+  useEffect(() => { if (!openId) return; const t = setTimeout(kirimPres, 350); return () => clearTimeout(t) }, [draft, cursor?.rowId, cursor?.key, cursor?.editing, openId])
+  useEffect(() => { if (!openId) return; const h = setInterval(kirimPres, 6000); return () => { clearInterval(h); ask('livePresence', { groupId: openId, clear: true }, true) } }, [openId])
   const changed = Object.keys(draft).length
   const getValue = (r, k) => draft[r.id]?.[k] ?? r[k]
 
@@ -40,6 +48,13 @@ export default function InputData({ groupId, onBack }) {
     setHistory((h) => [...h, draft])
     setDraft((d) => { const n = { ...d }; for (const { id, key, v } of list) n[id] = { ...n[id], [key]: v }; return n })
     setMsg('')
+  }
+  // Tombol packing di tepi baris: dipacking = AREA otomatis "PACKING"; klik lagi = tag dilepas dan tulisan PACKING dihapus (isi AREA lain tidak disentuh)
+  const tagPacking = (r) => {
+    const area = String(getValue(r, 'area') ?? '').trim(), ch = { packed: r.packed ? '' : '1' }
+    if (!r.packed) ch.area = 'PACKING'; else if (area.toUpperCase() === 'PACKING') ch.area = ''
+    setDraft((d) => { if (!d[r.id] || !('area' in d[r.id])) return d; const { area: _x, ...sisa } = d[r.id]; const n = { ...d }; Object.keys(sisa).length ? (n[r.id] = sisa) : delete n[r.id]; return n }) // draft AREA baris ini diganti nilai dari server
+    return applyChanges({ [r.id]: ch })
   }
   const undo = () => {
     if (!history.length) return
@@ -83,9 +98,8 @@ export default function InputData({ groupId, onBack }) {
           <button className="btn" onClick={cancel} disabled={!changed}><X size={15} /> Batal</button>
           {msg && <span className="msg ok">{msg}</span>}
         </div>
-        <FilterBar fields={ITEM_FIELDS} value={fi} onChange={setFi} onClear={() => setFi(I0)} />
-        <div className="hint" style={{ margin: '2px 0' }}>Klik sel untuk memilih; klik 2x (atau F2 / langsung ketik) untuk mengisi sel kuning. Enter / Tab menyimpan dan pindah sel, Esc membatalkan. Bisa paste banyak sel dari Excel. Setelah selesai klik Submit.</div>
-        <DataTable fileName={`Container-${open.container}`} rows={shown} manage groupId={open.id} editable={editable} editing={editing} compactTools getValue={getValue} onChange={change} onChangeMany={changeMany} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={(r) => applyChanges({ [r.id]: { packed: r.packed ? '' : '1' } })} />
+        {showFilter && <FilterBar fields={ITEM_FIELDS} value={fi} onChange={setFi} onClear={() => setFi(I0)} />}
+        <DataTable fileName={`Container-${open.container}`} rows={shown} manage groupId={open.id} editable={editable} editing={editing} compactTools leadExtras={<button className={'btn sm' + (showFilter ? ' on' : '')} aria-pressed={showFilter} onClick={() => setShowFilter((v) => !v)} title="Tampilkan / sembunyikan filter SO, SO Item, Product Code"><Filter size={14} /> Filter{Object.values(fi).some(Boolean) ? ' •' : ''}</button>} getValue={getValue} onChange={change} onChangeMany={changeMany} onCursor={setCursor} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={tagPacking} />
         {nt && <Notulen calc={calcRef.current} group={open} rows={rows.filter((r) => r.groupId === open.id)} onClose={() => setNt(false)} />}
         {dialog}
       </div>

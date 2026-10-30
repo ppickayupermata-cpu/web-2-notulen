@@ -273,3 +273,21 @@ button.sc{cursor:pointer}button.sc:hover{border-color:var(--accent)}.sc.zero{opa
 .grid th,.logtbl th{background:var(--th-bg)!important;color:var(--th-ink)!important}
 .grid th.in{background:var(--th-in)!important}
 .grid th .rz:hover{background:#fff}.grid th button,.grid th .icon-btn{color:var(--th-ink)}
+
+/* Baris alat Input: Edit cells + ringkasan sejajar satu baris */
+.totalbar.compact{align-items:center;gap:8px;row-gap:6px}.totalbar.compact .spacer{flex:1}
+.sumbar.inline{margin:0;flex:0 1 auto}
+
+/* Live: satu area geser untuk semua tabel (sentuh di mana saja untuk menggeser), zoom, layar penuh, kursor admin */
+.livepage{max-width:none;margin:0;padding:10px 12px 0;height:100vh;height:100dvh;min-height:0;display:flex;flex-direction:column;box-sizing:border-box}
+.live-vp{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;cursor:grab;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.live-vp.panning{cursor:grabbing;user-select:none}
+.live-zoom{width:max-content;min-width:100%;padding-bottom:40px}
+.live-so{content-visibility:visible!important;margin:0 0 14px}.live-so .sotitle{position:sticky;left:0;width:max-content;max-width:100vw;z-index:2}
+.live-so .grid{table-layout:fixed}.live-so .grid th{top:0}
+.live-full{padding:0}.live-full .live-vp{border:0;border-radius:0}
+.live-edit{display:inline-flex;align-items:center;gap:5px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px}
+.grid td.draftcell{background:#fef9c3!important;color:#713f12;font-style:italic}[data-theme=dark] .grid td.draftcell{background:#4a3f12!important;color:#fde68a}
+.grid td.cursorcell{position:relative;outline:2px solid #f59e0b;outline-offset:-2px}
+.grid td.cursorcell::after{content:attr(data-who);position:absolute;left:-2px;top:-17px;z-index:5;background:#f59e0b;color:#1f1300;font:700 11px/1 sans-serif;padding:2px 6px;border-radius:5px 5px 5px 0;white-space:nowrap;pointer-events:none}
+.icon-btn.on{background:var(--accent-soft);color:var(--accent)}

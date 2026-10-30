@@ -87,7 +87,7 @@ export function DataProvider({ token, onUnauthorized, children }) {
   }
   const mergeRows = (groupId, insert, update, fileName, remove = []) => act('mergeRows', { groupId, insert, update, fileName, remove })
   // aksi yang mengembalikan data (bukan hanya true/false), mis. riwayat sel
-  const ask = async (action, payload = {}) => { try { return await api('/api/act', { token, body: { action, ...payload } }) } catch (e) { fail(e.status ? e : new Error('Tidak bisa terhubung ke server.')); return null } }
+  const ask = async (action, payload = {}, quiet = false) => { try { return await api('/api/act', { token, body: { action, ...payload } }) } catch (e) { if (!quiet) fail(e.status ? e : new Error('Tidak bisa terhubung ke server.')); return null } }
   const cellHistory = async (rowId, key) => (await ask('cellHistory', { rowId, key }))?.history || []
   const snapshotNow = () => act('snapshotNow')
   const dropSnapshot = (id) => act('dropSnapshot', { id })

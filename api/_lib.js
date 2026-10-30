@@ -32,6 +32,7 @@ export function ensureDb() {
       db`create table if not exists settings (key text primary key, value jsonb not null)`,
       db`create table if not exists backups (seq bigserial, id text primary key, container text not null, at timestamptz not null default now(), by text, n int not null default 0, payload jsonb not null)`,
       db`create table if not exists live_links (group_id text primary key references groups(id) on delete cascade, token text not null unique, enabled boolean not null default true, created_at timestamptz not null default now())`,
+      db`create table if not exists live_presence (group_id text primary key references groups(id) on delete cascade, editor text, row_id text, col text, editing boolean not null default false, draft jsonb not null default '{}'::jsonb, at timestamptz not null default now())`,
       db`create table if not exists snapshots (seq bigserial, id text primary key, at timestamptz not null default now(), kind text not null, by text, n_groups int not null default 0, n_rows int not null default 0, payload jsonb not null)`,
       db`create table if not exists cell_history (id bigserial primary key, row_id text not null, col text not null, old_v text, new_v text, by text, at timestamptz not null default now())`,
       db`create index if not exists cell_history_idx on cell_history(row_id, col, at desc)`,

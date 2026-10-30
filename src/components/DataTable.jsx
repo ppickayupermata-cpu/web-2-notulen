@@ -12,7 +12,7 @@ const isN = (x) => x !== '' && x != null && Number.isFinite(Number(x))
 const show = (c, v) => (c.type === 'date' && v && !String(v).startsWith('#') ? String(v).split('-').reverse().join('/') : v)
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch { return d } }
 
-export default function DataTable({ rows, editable = [], editing = false, getValue, onChange, selectable = false, selected = [], onToggle, onToggleAll, fileName, manage = false, groupId, onNotulen, onPack, compactTools = false, onChangeMany }) {
+export default function DataTable({ rows, editable = [], editing = false, getValue, onChange, selectable = false, selected = [], onToggle, onToggleAll, fileName, manage = false, groupId, onNotulen, onPack, compactTools = false, onChangeMany, leadExtras = null, onCursor }) {
   const { settings, setSettings, addRows, removeRows, rows: allRows, cellHistory, applyChanges } = useData()
   const { confirm, dialog } = useConfirm()
   const extra = (settings.cols || []).map((c) => ({ ...c, type: 'text' }))
@@ -22,6 +22,8 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
   const [menu, setMenu] = useState(false)
   const [sel, setSel] = useState(null)
   const [drag, setDrag] = useState(false)
+  const [ui, setUi] = useState(() => { try { return { sum: true, nav: false, ...JSON.parse(localStorage.getItem('pl_ui_dt')) } } catch { return { sum: true, nav: false } } }) // baris Ringkasan / Navigasi SO bisa disembunyikan
+  useEffect(() => { try { localStorage.setItem('pl_ui_dt', JSON.stringify(ui)) } catch { /* mode privat */ } }, [ui])
   const [toolsOpen, setToolsOpen] = useState(false), [pasteMsg, setPasteMsg] = useState('') // panel Edit cells (mode ringkas) + pesan hasil paste
   const [ed, setEd] = useState(null) // sel yang sedang diketik (mode edit seperti Excel): { id, key, orig }
   const [sort, setSort] = useState(null)
@@ -235,10 +237,34 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
   const nLate = un.filter((r) => tgt(r) && tgt(r) < todayS && !kirimOf(r)).length, nToday = un.filter((r) => tgt(r) === todayS).length
   const nNoArea = un.filter((r) => !String(calc(r, 'area') ?? '').trim()).length
   const perArea = Object.entries(un.reduce((m, r) => { const a = String(calc(r, 'area') ?? '').trim().toUpperCase(); if (a) m[a] = (m[a] || 0) + 1; return m }, {})).sort((a, b) => b[1] - a[1])
+  useEffect(() => { // posisi kursor / sel yang sedang diketik dilaporkan (dipakai tampilan live untuk menunjukkan kursor admin)
+    if (!onCursor) return
+    const r = rg && vis[rg.r0], c = rg && cols[rg.c0]
+    onCursor(r && c ? { rowId: r.id, key: c.key, editing: !!ed } : null)
+  }, [rg?.r0, rg?.c0, ed?.id, ed?.key])
   const bukaRh = async () => { if (!rg || !vis[rg.r0] || !cols[rg.c0]) return; const row = vis[rg.r0], col = cols[rg.c0]; setRh({ row, col, list: null }); setRh({ row, col, list: await cellHistory(row.id, col.key) }) }
   const kembalikan = async (e) => { if (!(await confirm({ title: 'Kembalikan nilai sel?', message: `Sel ${rh.col.label} diubah kembali menjadi "${show(rh.col, e.old) || '(kosong)'}".`, confirmLabel: 'Kembalikan' }))) return; await applyChanges({ [rh.row.id]: { [rh.col.key]: e.old } }); setRh(null) }
   const B = ({ t, d, f, children, cls = 'icon-btn dark' }) => <button className={cls} disabled={d} title={t} onClick={f}>{children}</button>
 
+  const sumChips = (
+    <>
+        <span className="sc ok"><PackageCheck size={14} /> Dipacking {rows.length - un.length}/{rows.length}</span>
+        <button className={'sc late' + (nLate ? '' : ' zero')} title="Target sudah lewat, belum dipacking dan belum ada tanggal pengiriman (klik untuk menyorot di tabel)" onClick={() => setWarn(true)}><AlertTriangle size={14} /> Terlambat {nLate}</button>
+        <span className={'sc due' + (nToday ? '' : ' zero')}><CalendarClock size={14} /> Target hari ini {nToday}</span>
+        <span className={'sc' + (nNoArea ? ' warn' : ' zero')}>AREA belum diisi {nNoArea}</span>
+        {perArea.map(([a, n]) => <button key={a} className={'sc area' + (flt.area === a ? ' on' : '')} title={'Tampilkan hanya AREA ' + a + ' (klik lagi untuk lepas)'} onClick={() => { setShowF(true); setFlt(flt.area === a ? {} : { area: a }) }}>{a} <b>{n}</b></button>)}
+    </>
+  )
+  const navBtns = (
+    <>
+        <span className="hint">{segs.length} SO</span>
+        <select aria-label="Lompat ke SO" value="" onChange={(e) => e.target.value !== '' && goTo(+e.target.value)}><option value="">Lompat ke SO…</option>{segs.map((sg, i) => <option key={sg.so} value={i}>SO {sg.so} ({sg.end - sg.start} baris)</option>)}</select>
+        <button className="btn sm" onClick={() => goTo(Math.max(curSo() - 1, 0))}><ChevronLeft size={14} /> SO sebelumnya</button>
+        <button className="btn sm" onClick={() => goTo(Math.min(curSo() + 1, segs.length - 1))}>SO berikutnya <ChevronRight size={14} /></button>
+        <button className="btn sm" onClick={() => wrapRef.current?.scrollTo({ top: 0 })}><ChevronsUp size={14} /> Atas</button>
+        <button className="btn sm" onClick={() => wrapRef.current?.scrollTo({ top: wrapRef.current.scrollHeight })}><ChevronsDown size={14} /> Bawah</button>
+    </>
+  )
   const toolBtns = (
     <>
           <div className="pop">
@@ -290,7 +316,13 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
     <>
       <div className={'totalbar' + (compactTools ? ' compact' : '')}>
         {compactTools ? <>
-          <div className="tools"><button className={'btn sm primary' + (toolsOpen ? ' on' : '')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)} title="Tampilkan / sembunyikan semua alat edit (warna, merge, kolom, cari, dst.)"><Wrench size={15} /> Edit cells <ChevronDown size={14} style={{ transform: toolsOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} /></button></div>
+          <div className="tools">{leadExtras}<button className={'btn sm primary' + (toolsOpen ? ' on' : '')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)} title="Tampilkan / sembunyikan semua alat edit (warna, merge, kolom, cari, dst.)"><Wrench size={15} /> Edit cells <ChevronDown size={14} style={{ transform: toolsOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} /></button></div>
+          {onNotulen && ui.sum && <div className="sumbar inline" aria-label="Ringkasan target">{sumChips}</div>}
+          <span className="spacer" />
+          <div className="tools">
+            {onNotulen && <button className={'btn sm' + (ui.sum ? ' on' : '')} aria-pressed={ui.sum} onClick={() => setUi((u) => ({ ...u, sum: !u.sum }))} title="Tampilkan / sembunyikan ringkasan (Dipacking, Terlambat, AREA…)"><PackageCheck size={14} /> Ringkasan</button>}
+            {segs.length > 1 && <button className={'btn sm' + (ui.nav ? ' on' : '')} aria-pressed={ui.nav} onClick={() => setUi((u) => ({ ...u, nav: !u.nav }))} title="Tampilkan / sembunyikan navigasi antar SO"><ChevronsDown size={14} /> Navigasi SO</button>}
+          </div>
           {toolsOpen && <div className="tools tools-panel">{toolBtns}</div>}
         </> : <div className="tools">{toolBtns}</div>}
       </div>
@@ -302,21 +334,8 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
         {editing && <><Replace size={15} /><input placeholder="Ganti dengan…" value={fnd.rep} onChange={(e) => setFnd({ ...fnd, rep: e.target.value })} /><button className="btn sm" disabled={!fcur} onClick={() => repl([fcur])}>Ganti</button><button className="btn sm" disabled={!fh.length} onClick={() => repl(fh)}>Ganti semua</button></>}
         <button className="icon-btn dark" title="Tutup (Esc)" onClick={() => setFnd(null)}><X size={15} /></button></div>}
       <datalist id="dl-area">{areas.map((a) => <option key={a} value={a} />)}</datalist>
-      {onNotulen && <div className="sumbar" aria-label="Ringkasan target">
-        <span className="sc ok"><PackageCheck size={14} /> Dipacking {rows.length - un.length}/{rows.length}</span>
-        <button className={'sc late' + (nLate ? '' : ' zero')} title="Target sudah lewat, belum dipacking dan belum ada tanggal pengiriman (klik untuk menyorot di tabel)" onClick={() => setWarn(true)}><AlertTriangle size={14} /> Terlambat {nLate}</button>
-        <span className={'sc due' + (nToday ? '' : ' zero')}><CalendarClock size={14} /> Target hari ini {nToday}</span>
-        <span className={'sc' + (nNoArea ? ' warn' : ' zero')}>AREA belum diisi {nNoArea}</span>
-        {perArea.map(([a, n]) => <button key={a} className={'sc area' + (flt.area === a ? ' on' : '')} title={'Tampilkan hanya AREA ' + a + ' (klik lagi untuk lepas)'} onClick={() => { setShowF(true); setFlt(flt.area === a ? {} : { area: a }) }}>{a} <b>{n}</b></button>)}
-      </div>}
-      {segs.length > 1 && <div className="sonav">
-        <span className="hint">{segs.length} SO</span>
-        <select aria-label="Lompat ke SO" value="" onChange={(e) => e.target.value !== '' && goTo(+e.target.value)}><option value="">Lompat ke SO…</option>{segs.map((sg, i) => <option key={sg.so} value={i}>SO {sg.so} ({sg.end - sg.start} baris)</option>)}</select>
-        <button className="btn sm" onClick={() => goTo(Math.max(curSo() - 1, 0))}><ChevronLeft size={14} /> SO sebelumnya</button>
-        <button className="btn sm" onClick={() => goTo(Math.min(curSo() + 1, segs.length - 1))}>SO berikutnya <ChevronRight size={14} /></button>
-        <button className="btn sm" onClick={() => wrapRef.current?.scrollTo({ top: 0 })}><ChevronsUp size={14} /> Atas</button>
-        <button className="btn sm" onClick={() => wrapRef.current?.scrollTo({ top: wrapRef.current.scrollHeight })}><ChevronsDown size={14} /> Bawah</button>
-      </div>}
+      {!compactTools && onNotulen && <div className="sumbar" aria-label="Ringkasan target">{sumChips}</div>}
+      {(compactTools ? ui.nav : true) && segs.length > 1 && <div className="sonav">{navBtns}</div>}
       <div ref={wrapRef} onScroll={onScroll} className="tablewrap pad" tabIndex={0} onCopy={onCopy} onPaste={onPaste} onKeyDown={onKey}>
         {segs.map((sg, si) => (
           <div key={sg.so} className="sobox" style={{ containIntrinsicSize: 'auto ' + (80 + (sg.end - sg.start) * 38) + 'px' }}>
@@ -380,7 +399,7 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
           </div>
         ))}
       </div>
-      <div className="statfoot" role="status" aria-live="polite">{pasteMsg ? <b>{pasteMsg}</b> : st && st.n > 0 ? <><span>{st.cells} sel dipilih</span><span>Terisi: {st.n}</span>{st.k > 0 && <><span>Jumlah: <b>{nf(st.sm)}</b></span><span>Rata-rata: <b>{nf(st.sm / st.k)}</b></span><span>Min: {nf(st.mn)}</span><span>Maks: {nf(st.mx)}</span></>}</> : <span>Pilih sel untuk melihat jumlah, rata-rata, dan lainnya.</span>}</div>
+      <div className="statfoot" role="status" aria-live="polite">{pasteMsg ? <b>{pasteMsg}</b> : st && st.n > 0 ? <><span>{st.cells} sel dipilih</span><span>Terisi: {st.n}</span>{st.k > 0 && <><span>Jumlah: <b>{nf(st.sm)}</b></span><span>Rata-rata: <b>{nf(st.sm / st.k)}</b></span><span>Min: {nf(st.mn)}</span><span>Maks: {nf(st.mx)}</span></>}</> : <span>{editing ? 'Klik sel untuk memilih · klik 2x / F2 / ketik untuk mengisi · Enter / Tab simpan & pindah · Esc batal · bisa paste banyak sel dari Excel' : 'Pilih sel untuk melihat jumlah, rata-rata, dan lainnya.'}</span>}</div>
       {rh && <div className="overlay" onClick={() => setRh(null)}><div className="modal" role="dialog" aria-modal="true" aria-label="Riwayat sel" style={{ width: 'min(560px,94vw)' }} onClick={(e) => e.stopPropagation()}>
         <div className="toolbar"><h3 style={{ margin: 0 }}>Riwayat sel · {rh.col.label}</h3><span className="spacer" /><button className="icon-btn" aria-label="Tutup" onClick={() => setRh(null)}><X size={18} /></button></div>
         <p className="hint">SO {rh.row.so || '-'} · PO {rh.row.po || '-'} · {rh.row.productName}</p>

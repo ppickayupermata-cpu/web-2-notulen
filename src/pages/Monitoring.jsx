@@ -63,7 +63,7 @@ export default function Monitoring({ by }) {
         </div>
         <FilterBar fields={ITEM_FIELDS} value={fi} onChange={setFi} onClear={() => setFi(I0)} />
         <div className="count">{shown.length} baris</div>
-        <DataTable fileName={`Container-${open.container}`} rows={shown} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={(r) => applyChanges({ [r.id]: { packed: r.packed ? '' : '1' } })} />
+        <DataTable fileName={`Container-${open.container}`} rows={shown} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={(r) => applyChanges({ [r.id]: { packed: r.packed ? '' : '1', ...(r.packed ? (String(r.area || '').trim().toUpperCase() === 'PACKING' ? { area: '' } : {}) : { area: 'PACKING' }) } })} />
         {nt && <Notulen calc={calcRef.current} group={open} rows={rows.filter((r) => r.groupId === open.id)} onClose={() => setNt(false)} />}
         {ld && <LiveDialog group={ld} onClose={() => setLd(null)} />}
       </>

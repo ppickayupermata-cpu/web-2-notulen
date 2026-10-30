@@ -53,6 +53,21 @@ export default async function handler(req, res) {
         else if (typeof b.enabled === 'boolean') { await db`update live_links set enabled = ${b.enabled} where group_id = ${gid}`; l = (await db`select token, enabled from live_links where group_id = ${gid}`)[0] }
         return send(res, 200, { token: l.token, enabled: l.enabled })
       }
+      case 'livePresence': { // admin yang sedang di halaman Input: kursor + isian yang BELUM di-Submit; tampilan live menunjukkannya langsung (kedaluwarsa 20 detik tanpa denyut)
+        const gid = String(b.groupId || '')
+        if (b.clear) { await db`delete from live_presence where group_id = ${gid}`; return send(res, 200, { ok: true }) }
+        const [g] = await db`select id from groups where id = ${gid}`
+        if (!g) return send(res, 404, { error: 'Container tidak ditemukan.' })
+        const draft = {}; let n = 0
+        for (const [rid, ch] of Object.entries(b.draft || {})) {
+          const p = {}
+          for (const [k, v] of Object.entries(ch || {})) if (n < 3000 && (EDIT.has(k) || /^x\d{1,2}$/.test(k))) { p[k] = clip(v, k === 'ket' ? 300 : 80); n++ }
+          if (Object.keys(p).length) draft[String(rid).slice(0, 60)] = p
+        }
+        await db`insert into live_presence(group_id, editor, row_id, col, editing, draft, at) values (${gid}, ${user.username}, ${b.rowId ? String(b.rowId).slice(0, 60) : null}, ${b.key ? String(b.key).slice(0, 30) : null}, ${!!b.editing}, ${JSON.stringify(draft)}::jsonb, now())
+                  on conflict (group_id) do update set editor = excluded.editor, row_id = excluded.row_id, col = excluded.col, editing = excluded.editing, draft = excluded.draft, at = excluded.at`
+        return send(res, 200, { ok: true })
+      }
       case 'snapshotNow': { await snapshot(db, 'manual', user.username); return send(res, 200, { ok: true }) }
       case 'dropSnapshot': { await db`delete from snapshots where id = ${String(b.id)}`; return send(res, 200, { ok: true }) }
       case 'restoreSnapshot': { // kembalikan SELURUH data ke cadangan; keadaan sekarang disimpan dulu sebagai cadangan "sebelum-pulih"
