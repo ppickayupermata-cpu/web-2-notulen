@@ -268,7 +268,7 @@ button.sc{cursor:pointer}button.sc:hover{border-color:var(--accent)}.sc.zero{opa
 .fsfab-panel{position:absolute;display:flex;gap:4px;padding:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(20,24,40,.25);animation:fabin .18s ease-out}@keyframes fabin{from{opacity:0;transform:scale(.9)}}
 
 /* Header (judul kolom) semua tabel berwarna biru agar mudah dibedakan dari isi tabel */
-:root{--th-bg:#e5ff00;--th-in:#e5ff00;--th-ink:#1F2433}
+:root{--th-bg:#1d4ed8;--th-in:#3b82f6;--th-ink:#fff}
 [data-theme=dark]{--th-bg:#1e3a8a;--th-in:#2563eb}
 .grid th,.logtbl th{background:var(--th-bg)!important;color:var(--th-ink)!important}
 .grid th.in{background:var(--th-in)!important}
@@ -291,3 +291,21 @@ button.sc{cursor:pointer}button.sc:hover{border-color:var(--accent)}.sc.zero{opa
 .grid td.cursorcell{position:relative;outline:2px solid #f59e0b;outline-offset:-2px}
 .grid td.cursorcell::after{content:attr(data-who);position:absolute;left:-2px;top:-17px;z-index:5;background:#f59e0b;color:#1f1300;font:700 11px/1 sans-serif;padding:2px 6px;border-radius:5px 5px 5px 0;white-space:nowrap;pointer-events:none}
 .icon-btn.on{background:var(--accent-soft);color:var(--accent)}
+
+/* Watermark "La Von So" — liquid glass, kanan bawah */
+.wm{position:fixed;right:26px;bottom:10px;z-index:6;pointer-events:none;user-select:none;-webkit-user-select:none;overflow:hidden;padding:5px 16px 6px;border-radius:999px;
+  font:700 13px/1.15 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.09em;opacity:.9;
+  background:linear-gradient(135deg,rgba(255,255,255,.62),rgba(255,255,255,.14) 55%,rgba(160,170,255,.22));
+  -webkit-backdrop-filter:blur(10px) saturate(1.9) contrast(1.05);backdrop-filter:blur(10px) saturate(1.9) contrast(1.05);
+  border:1px solid rgba(255,255,255,.7);
+  box-shadow:0 8px 24px rgba(60,70,140,.2),inset 0 1.5px 1px rgba(255,255,255,.95),inset 0 -3px 7px rgba(110,120,230,.22),inset 1.5px 0 2px rgba(255,255,255,.5)}
+.wm span{position:relative;background:linear-gradient(100deg,#4338ca,#0891b2 52%,#7c3aed);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 1px 0 rgba(255,255,255,.7))}
+.wm::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 38%,rgba(255,255,255,.8) 50%,transparent 62%);transform:translateX(-130%);animation:wmsheen 7s ease-in-out infinite}
+@keyframes wmsheen{0%,72%{transform:translateX(-130%)}100%{transform:translateX(130%)}}
+[data-theme=dark] .wm{background:linear-gradient(135deg,rgba(255,255,255,.2),rgba(255,255,255,.05) 55%,rgba(130,140,255,.16));border-color:rgba(255,255,255,.3);
+  box-shadow:0 8px 24px rgba(0,0,0,.45),inset 0 1.5px 1px rgba(255,255,255,.4),inset 0 -3px 7px rgba(120,130,255,.2)}
+[data-theme=dark] .wm span{background:linear-gradient(100deg,#a5b4fc,#67e8f9 52%,#c4b5fd);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+.statfoot{padding-right:170px}   /* teks bilah status tidak menabrak watermark */
+@media (max-width:640px){.wm{right:14px;bottom:6px;font-size:11px;padding:3px 11px 4px}.statfoot{padding-right:120px}}
+@media (prefers-reduced-motion:reduce){.wm::after{animation:none}}
+@media print{.wm{display:none!important}}

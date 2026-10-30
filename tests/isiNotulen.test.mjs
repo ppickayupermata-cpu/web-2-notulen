@@ -53,3 +53,6 @@ test('ringkasan berada di bawah daftar, tepat di atas NOTE', () => {
   assert.ok(t.indexOf('AREA PC') > t.indexOf('• 200, 9 ada di PACK'))
 })
 test('tanpa rincian: tidak ada ringkasan', () => { assert.ok(!susunDokumen({ judul: 'N', hari: 'H', tempat: 'T', jam: 'J', hadir: [], items, heading: 'H', note: 'N' }).includes('AREA ')) })
+test('ringkasan per AREA ikut menampilkan GROUP setelah PO', () => {
+  assert.equal(ringkasArea([{ area: 'LIST', so: '1', po: 'P1', group: 'AF 27', tg: '29 oktober 2026', kets: [] }]), 'AREA LIST\n• 1, P1 [ AF 27 ] target selesai 29 oktober 2026')
+})

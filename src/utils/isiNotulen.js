@@ -5,6 +5,7 @@
 //   bullet di bawah "Peserta :" = daftar peserta (sampai ada teks lain atau dua baris kosong)
 //   "• " atau "- " = bullet; spasi di depan 2+ = bullet tingkat 2; "*" di depan = judul tebal
 //   "NOTE : .." = catatan merah; baris kosong = jarak; selain itu = paragraf biasa
+import { bungkusGroup } from './notulen.js'
 export const BUL = '• '
 
 // Ringkasan per AREA di bagian bawah notulen (di atas NOTE): "AREA PC" lalu bullet semua catatan di area itu, dst.
@@ -13,7 +14,7 @@ export function ringkasArea(rincian = []) {
   const m = new Map()
   for (const e of rincian) { const a = String(e.area || '').trim().replace(/\s+/g, ' ').toUpperCase(); m.set(a, [...(m.get(a) || []), e]) }
   const urut = [...m].sort((x, y) => (x[0] === '') - (y[0] === ''))
-  return urut.map(([a, list]) => [a ? 'AREA ' + a : 'TANPA AREA', ...list.map((e) => BUL + [e.so, e.po].filter(Boolean).join(', ') + (e.tg ? ` target selesai ${e.tg}` : '') + (e.kets?.length ? `, ( ${e.kets.join('; ')} )` : '') + (e.container ? ` · ${e.container}` : ''))].join('\n')).join('\n\n')
+  return urut.map(([a, list]) => [a ? 'AREA ' + a : 'TANPA AREA', ...list.map((e) => BUL + [e.so, e.po].filter(Boolean).join(', ') + (e.group ? ` ${bungkusGroup(e.group)}` : '') + (e.tg ? ` target selesai ${e.tg}` : '') + (e.kets?.length ? `, ( ${e.kets.join('; ')} )` : '') + (e.container ? ` · ${e.container}` : ''))].join('\n')).join('\n\n')
 }
 
 // Satu SO = satu daftar: baris pertama "• SO, catatan" (bullet tingkat 1), catatan berikutnya di SO yang sama "  • catatan" (tingkat 2).
