@@ -28,3 +28,24 @@ export function cariGrup(header, rows, groups, allRows) {
   const best = [...hit].sort((a, b) => b[1] - a[1])[0]
   return best && best[1] >= Math.max(1, Math.ceil(rows.length / 2)) ? groups.find((g) => g.id === best[0]) : null
 }
+
+// ---- Pindah / salin data lama ke container baru ----
+// Rencana untuk baris lama terpilih: baris yang SUDAH ada di container tujuan (kunci SO + SO Item sama) hanya diisi isiannya,
+// baris yang BELUM ada ditambahkan utuh (berlabel OLD). timpa=false: isian yang sudah terisi di tujuan tidak diubah.
+const ISIAN = ['area', 'target', 'ket', 'kirim']
+const isiKosong = (v) => String(v ?? '').trim() === ''
+export function rencanaPindah(dipilih, tujuan, { timpa = false } = {}) {
+  const pool = new Map()
+  tujuan.forEach((r) => { const k = rowKey(r); pool.set(k, [...(pool.get(k) || []), r]) })
+  const insert = [], fill = []
+  for (const r of dipilih) {
+    const ex = pool.get(rowKey(r))?.shift()
+    if (!ex) { const { id, groupId, label, ...data } = r; insert.push(data); continue }
+    const keys = [...ISIAN, ...Object.keys(r).filter((k) => /^x\d{1,2}$/.test(k))]
+    const patch = {}
+    keys.forEach((k) => { if (!isiKosong(r[k]) && (timpa || isiKosong(ex[k])) && String(r[k]) !== String(ex[k] ?? '')) patch[k] = r[k] })
+    if (r.packed && (timpa || !ex.packed)) patch.packed = r.packed
+    if (Object.keys(patch).length) fill.push({ id: ex.id, patch })
+  }
+  return { insert, fill }
+}

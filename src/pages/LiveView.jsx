@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Radio, Search, Sun, Moon, AlertTriangle, PackageCheck, ZoomIn, ZoomOut, Maximize, Minimize, ScanLine, Pencil, Crosshair } from 'lucide-react'
-import { ALL_COLS } from '../config.js'
+import { colsFor } from '../config.js'
 import { useUi } from '../context/UiContext.jsx'
 import { jamStr } from '../components/JamMerah.jsx'
 import FsFab from '../components/FsFab.jsx'
@@ -44,7 +44,7 @@ export default function LiveView({ token }) {
   // ---- isian admin yang belum di-Submit ditumpuk di atas data tersimpan ----
   const pr = d?.presence || null
   const rowsAll = useMemo(() => (d?.rows || []).map((r) => { const dr = pr?.draft?.[r.id]; return dr ? { ...r, ...dr, _draft: Object.keys(dr) } : r }), [d])
-  const cols = useMemo(() => ALL_COLS.filter((c) => c.key !== 'group' || rowsAll.some((r) => r.group)), [rowsAll])
+  const cols = useMemo(() => colsFor(d?.group).filter((c) => c.key !== 'group' || rowsAll.some((r) => r.group)), [rowsAll, d?.group?.kind])
   const rows = useMemo(() => { const t = q.toLowerCase().split(/\s+/).filter(Boolean); return rowsAll.filter((r) => !t.length || t.every((w) => [r.so, r.po, r.productName, r.productCode, r.area, r.ket].join(' ').toLowerCase().includes(w))) }, [rowsAll, q])
   const bySo = useMemo(() => { const m = new Map(); rows.forEach((r) => m.set(r.so, [...(m.get(r.so) || []), r])); return [...m] }, [rows])
   const hari = todayISO(), un = rowsAll.filter((r) => !r.packed)

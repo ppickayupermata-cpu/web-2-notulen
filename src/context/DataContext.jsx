@@ -80,7 +80,7 @@ export function DataProvider({ token, onUnauthorized, children }) {
     const now = Date.now(); Object.entries(changes).forEach(([id, p]) => Object.entries(p).forEach(([k, v]) => { if (k !== 'packed') mine.current[id + '|' + k] = { v, at: now } }))
     return act('applyChanges', { changes })
   }
-  const addGroup = (group, rows, by, fileName) => act('addGroup', { group, rows, fileName })
+  const addGroup = (group, rows, by, fileName, mode) => act('addGroup', { group, rows, fileName, mode })
   const updateGroup = (id, patch) => {
     local((d) => ({ ...d, groups: d.groups.map((g) => (g.id === id ? { ...g, ...patch } : g)) }))
     return act('updateGroup', { id, ...patch })
@@ -93,6 +93,9 @@ export function DataProvider({ token, onUnauthorized, children }) {
   const dropSnapshot = (id) => act('dropSnapshot', { id })
   const restoreSnapshot = (id) => act('restoreSnapshot', { id })
   const restoreBackup = (id) => act('restoreBackup', { id })
+  const moveRows = (p) => act('moveRows', p)
+  const backupInfo = (id) => ask('backupInfo', { id }), snapshotInfo = (id) => ask('snapshotInfo', { id })
+  const clearLabels = (groupId) => act('clearLabels', { groupId })
   const dropBackup = (id) => act('dropBackup', { id })
   const addRows = (groupId, count = 1) => act('addRows', { groupId, count })
   const removeGroup = (id, by, reason) => act('removeGroup', { id, reason })
@@ -108,7 +111,7 @@ export function DataProvider({ token, onUnauthorized, children }) {
   return (
     <Ctx.Provider value={{
       ...db, token, loading, error, clearError: () => setError(''), refresh, ask, saving, lastSaved, notice, clearNotice: () => setNotice(''),
-      applyChanges, updateGroup, addRows, mergeRows, restoreBackup, dropBackup, cellHistory, snapshotNow, dropSnapshot, restoreSnapshot, addGroup, removeGroup, removeRows, addSchedules, removeSchedule, setSettings, removeLogs,
+      applyChanges, updateGroup, addRows, mergeRows, moveRows, clearLabels, backupInfo, snapshotInfo, restoreBackup, dropBackup, cellHistory, snapshotNow, dropSnapshot, restoreSnapshot, addGroup, removeGroup, removeRows, addSchedules, removeSchedule, setSettings, removeLogs,
     }}>
       {children}
     </Ctx.Provider>

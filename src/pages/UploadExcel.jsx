@@ -1,15 +1,17 @@
 import { useState } from 'react'
-import { ListChecks, GitMerge, Replace, X, Undo2, UploadCloud, Columns3 } from 'lucide-react'
+import { ListChecks, GitMerge, Replace, X, Undo2, UploadCloud, Columns3, FolderPlus } from 'lucide-react'
 import { parseExcel } from '../utils/parseExcel.js'
 import { bandingkan, cariGrup } from '../utils/diffRows.js'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { INFO_COLS } from '../config.js'
+import UploadCoAds from './UploadCoAds.jsx'
 
 const TAG = { baru: 'Baru', sama: 'Sudah ada', berubah: 'Berubah' }
+const KIND = { ganti: 'sebelum diganti', hapus: 'sebelum dihapus', gabung: 'sebelum digabung', 'sebelum-pulih': 'sebelum pemulihan' }
 const LBL = Object.fromEntries(INFO_COLS.map((c) => [c.key, c.label]))
 
-export default function UploadExcel({ by }) {
+function UploadBiasa({ by }) {
   const { groups, rows: allRows, backups, addGroup, mergeRows, restoreBackup, dropBackup } = useData()
   const { confirm, dialog } = useConfirm()
   const [parsed, setParsed] = useState(null) // { header, rows, fileName }
@@ -22,8 +24,9 @@ export default function UploadExcel({ by }) {
   const [src, setSrc] = useState(null)        // file yang sedang dibaca (untuk baca ulang saat pemetaan kolom diubah)
   const [ovr, setOvr] = useState({})          // pemetaan kolom manual { indeksKolom: field }
   const [over, setOver] = useState(false)     // sedang menyeret file di atas area upload
+  const [baruOpen, setBaruOpen] = useState(false), [namaBaru, setNamaBaru] = useState('')  // form "Buat container baru"
 
-  const reset = () => { setParsed(null); setSrc(null); setOvr({}); setCustom(false); setPick(new Set()); setHapus(new Set()); setFileKey((k) => k + 1) }
+  const reset = () => { setParsed(null); setSrc(null); setOvr({}); setCustom(false); setPick(new Set()); setHapus(new Set()); setBaruOpen(false); setNamaBaru(''); setFileKey((k) => k + 1) }
   const baca = async (file, override = {}) => {
     try {
       const p = await parseExcel(file, override)
@@ -60,7 +63,19 @@ export default function UploadExcel({ by }) {
   const gabung = async () => { // hanya menambah baris baru (kolom input kosong); data lama dan isiannya tidak disentuh
     setBusy(true)
     const list = parsed.rows.map((_, i) => i).filter((i) => diff[i].kind === 'baru').map(info)
-    finish(await mergeRows(target.id, list, [], parsed.fileName), `Container ${target.container}: ${list.length} baris baru ditambahkan dengan kolom input kosong. Data lama dan isiannya dipertahankan.`)
+    finish(await mergeRows(target.id, list, [], parsed.fileName), `Container ${target.container}: ${list.length} baris baru ditambahkan (label NEW), ${lama.length} baris lama dipertahankan utuh (label OLD), termasuk ${hilang.length} baris yang tidak ada di file ini.`)
+  }
+  const bukaBaru = () => { // usulkan nama container baru yang belum dipakai
+    const pakai = new Set(groups.map((g) => g.container)); let i = 2
+    while (pakai.has(`${target.container}-${i}`)) i++
+    setNamaBaru(`${target.container}-${i}`); setBaruOpen(true)
+  }
+  const buatBaru = async () => {
+    const nama = namaBaru.trim()
+    if (!nama) return setMsg({ type: 'err', text: 'Nama container baru tidak boleh kosong.' })
+    if (groups.some((g) => g.container.trim().toLowerCase() === nama.toLowerCase())) return setMsg({ type: 'err', text: `Container ${nama} sudah ada. Pakai nama lain.` })
+    setBusy(true)
+    finish(await addGroup({ ...parsed.header, container: nama }, parsed.rows, by, parsed.fileName, 'baru'), `Container baru ${nama} dibuat (${parsed.rows.length} baris). Container ${target.container} tidak diubah; data lama bisa dimasukkan lewat tombol Pindah data di kolom Aksi Monitoring.`)
   }
   const terapkan = async () => {
     setBusy(true)
@@ -78,9 +93,13 @@ export default function UploadExcel({ by }) {
     finish(await addGroup(target ? { ...header, container: target.container } : header, rows, by, fileName), `Container ${target?.container || header.container}: ${rows.length} baris berhasil diimport${target ? ' (data lama diganti)' : ''}.`)
   }
   const pulihkan = async (b) => {
-    if (!(await confirm({ title: 'Batalkan penggantian?', message: `Container ${b.container} dikembalikan seperti sebelum diganti (${b.count} baris, lengkap dengan isian dan tag packing). Data container ini yang sekarang akan diganti.`, confirmLabel: 'Pulihkan', danger: true }))) return
+    const ada = groups.find((g) => g.container === b.container), nAda = ada ? allRows.filter((r) => r.groupId === ada.id).length : 0
+    const msgC = ada
+      ? `Container ${b.container} yang sekarang (${nAda} baris) akan dicadangkan dulu, lalu diganti isi cadangan ini (${b.count} baris, lengkap dengan isian dan tag packing). Cadangan ini tetap tersimpan.`
+      : `Container ${b.container} dibuat kembali dari cadangan ini (${b.count} baris, lengkap dengan isian dan tag packing). Cadangan ini tetap tersimpan.`
+    if (!(await confirm({ title: 'Pulihkan data container?', message: msgC, confirmLabel: 'Pulihkan', danger: !!ada }))) return
     setBusy(true); const ok = await restoreBackup(b.id); setBusy(false)
-    setMsg(ok ? { type: 'ok', text: `Container ${b.container} berhasil dipulihkan.` } : { type: 'err', text: 'Pemulihan gagal. Cadangan masih tersimpan, coba lagi.' })
+    setMsg(ok ? { type: 'ok', text: `Container ${b.container} berhasil dipulihkan (${b.count} baris).${ada ? ' Isi sebelumnya tersimpan di daftar cadangan.' : ''}` } : { type: 'err', text: 'Pemulihan gagal. Cadangan masih tersimpan, coba lagi.' })
   }
   const flip = (set, setter) => (k) => setter((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
   const toggle = flip(pick, setPick), toggleDel = flip(hapus, setHapus)
@@ -91,14 +110,14 @@ export default function UploadExcel({ by }) {
     <>
       <h2>Upload Excel Packing List</h2>
       {!parsed && backups?.length > 0 && (
-        <div className="msg warn"><b>Penggantian terakhir bisa dibatalkan</b> (cadangan otomatis di server):
-          {backups.slice(0, 3).map((b) => (
-            <div key={b.id} className="bkrow">Container {b.container} · {b.count} baris · {new Date(b.at).toLocaleString('id-ID')}{b.by ? ' · ' + b.by : ''}{' '}
-              <button className="btn sm" disabled={busy} onClick={() => pulihkan(b)}><Undo2 size={14} /> Batalkan penggantian</button>{' '}
+        <div className="msg warn"><b>Cadangan container di server</b> (dibuat otomatis sebelum data diganti, dihapus, atau digabung):
+          {backups.slice(0, 6).map((b) => (
+            <div key={b.id} className="bkrow">Container {b.container} · {b.count} baris · {KIND[b.kind] || b.kind || 'cadangan'} · {new Date(b.at).toLocaleString('id-ID')}{b.by ? ' · ' + b.by : ''}{' '}
+              <button className="btn sm" disabled={busy} onClick={() => pulihkan(b)}><Undo2 size={14} /> Pulihkan</button>{' '}
               <button className="btn sm" onClick={() => dropBackup(b.id)}>Buang cadangan</button></div>
           ))}</div>
       )}
-      <div className="panel">
+      <div className="panel wide">
         <label className={'dropzone' + (over ? ' over' : '')} onDragOver={(e) => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={onDrop}>
           <UploadCloud size={22} /><span><b>Seret file Excel ke sini</b> atau klik untuk memilih (.xlsx, .xls, .csv)</span>
           <input key={fileKey} type="file" accept=".xlsx,.xls,.csv" onChange={onFile} />
@@ -125,8 +144,23 @@ export default function UploadExcel({ by }) {
                 <div className="toolbar wrap">
                   <button className="btn primary" disabled={busy || !nBaru} onClick={gabung} title="Tambahkan baris baru dengan kolom input kosong; data lama dan isiannya dipertahankan"><GitMerge size={15} /> Gabungkan &amp; pertahankan data lama ({nBaru} baris baru)</button>
                   <button className="btn" disabled={busy} onClick={custom ? () => setCustom(false) : () => { setPick(barus()); setCustom(true) }}>{custom ? <><X size={15} /> Tutup pilihan</> : <><ListChecks size={15} /> Custom select</>}</button>
+                  <button className="btn" disabled={busy} onClick={bukaBaru} title="Simpan file ini sebagai container terpisah; container lama tidak diubah"><FolderPlus size={15} /> Buat container baru</button>
                   <button className="btn danger" disabled={busy} onClick={gantiSemua}><Replace size={15} /> Ganti semua</button>
                 </div>
+                {baruOpen && (
+                  <div className="toolbar wrap">
+                    <label className="inline">Nama container baru <input value={namaBaru} onChange={(e) => setNamaBaru(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && buatBaru()} autoFocus /></label>
+                    <button className="btn primary" disabled={busy} onClick={buatBaru}>{busy ? 'Menyimpan...' : `Buat (${parsed.rows.length} baris)`}</button>
+                    <button className="btn" disabled={busy} onClick={() => setBaruOpen(false)}>Batal</button>
+                  </div>
+                )}
+                {hilang.length > 0 && (
+                  <details className="pemetaan">
+                    <summary>{hilang.length} baris lama tidak ada di file ini (tetap dipertahankan bila Gabungkan)</summary>
+                    <div className="tablewrap" style={{ padding: 0 }}><table className="grid"><thead><tr><th>Status</th><th>SO</th><th>SO Item</th><th>PO</th><th>Product Name</th><th>Qty</th></tr></thead>
+                      <tbody>{hilang.map((r) => <tr key={r.id} className="up-hilang"><td><span className="chip-st up-hilang">OLD</span></td><td>{r.so}</td><td>{r.soItem}</td><td>{r.po}</td><td>{r.productName}</td><td>{r.qty}</td></tr>)}</tbody></table></div>
+                  </details>
+                )}
                 {!nBaru && !nUbah && !hilang.length && <p className="hint">Tidak ada baris baru maupun perubahan: isi file sama dengan data tersimpan.</p>}
               </div>
             )}
@@ -134,7 +168,7 @@ export default function UploadExcel({ by }) {
         )}
       </div>
       {parsed && target && custom && (
-        <div className="panel">
+        <div className="panel wide">
           <div className="toolbar wrap"><b>Pilih baris yang diterapkan</b><span className="hint">Baru = ditambahkan. Berubah / Sudah ada = hanya kolom identitas diperbarui; AREA, TARGET, KETERANGAN, TANGGAL PENGIRIMAN dan tag packing tetap.</span></div>
           <div className="toolbar wrap">
             <button className="btn sm" onClick={() => setPick(new Set(diff.map((_, i) => i)))}>Pilih semua</button>
@@ -184,6 +218,21 @@ export default function UploadExcel({ by }) {
         ))
       })()}
       {dialog}
+    </>
+  )
+}
+
+// Dua pilihan upload: biasa (format packing list standar) dan CO ADS (menyaring file DRAFT PL). Keduanya tetap terpasang agar isian tidak hilang saat berpindah pilihan.
+export default function UploadExcel({ by }) {
+  const [mode, setMode] = useState('biasa')
+  return (
+    <>
+      <div className="upmode" role="tablist" aria-label="Jenis upload">
+        <button role="tab" aria-selected={mode === 'biasa'} className={mode === 'biasa' ? 'on' : ''} onClick={() => setMode('biasa')}>Upload biasa</button>
+        <button role="tab" aria-selected={mode === 'coads'} className={mode === 'coads' ? 'on' : ''} onClick={() => setMode('coads')}>Upload CO ADS</button>
+      </div>
+      <div style={{ display: mode === 'biasa' ? 'block' : 'none' }}><UploadBiasa by={by} /></div>
+      <div style={{ display: mode === 'coads' ? 'block' : 'none' }}><h2>Upload CO ADS</h2><UploadCoAds by={by} /></div>
     </>
   )
 }

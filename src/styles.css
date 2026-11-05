@@ -309,3 +309,45 @@ button.sc{cursor:pointer}button.sc:hover{border-color:var(--accent)}.sc.zero{opa
 @media (max-width:640px){.wm{right:14px;bottom:6px;font-size:11px;padding:3px 11px 4px}.statfoot{padding-right:120px}}
 @media (prefers-reduced-motion:reduce){.wm::after{animation:none}}
 @media print{.wm{display:none!important}}
+
+/* label data lama / baru pada baris (hasil gabung / pindah data) */
+.lbl{display:block;font-style:normal;font-size:9px;font-weight:800;letter-spacing:.04em;line-height:1;text-transform:uppercase;padding:2px 5px;border-radius:8px;margin:2px auto 0;width:fit-content}
+.lbl-old{background:#fde68a;color:#78350f}.lbl-new{background:#bbf7d0;color:#14532d}
+[data-theme=dark] .lbl-old{background:#5b4a14;color:#fde68a}[data-theme=dark] .lbl-new{background:#14452f;color:#86efac}
+
+/* ---- perbaikan tata letak: teks tidak boleh bocor keluar kotak ---- */
+.panel{min-width:0}.panel.wide{max-width:none}
+.content,.panel,.msg,.hint,.count,.empty,.modal,.modal p,.modal h3,h2,h3,h4{overflow-wrap:anywhere}
+h2{line-height:1.3}
+.toolbar .hint,.toolbar .msg{flex:1 1 220px;min-width:0}
+.toolbar .btn,.panel .btn{max-width:100%;white-space:normal;text-align:left;line-height:1.25}
+.toolbar label.inline{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;max-width:100%}
+.toolbar select,.toolbar input:not([type=checkbox]){max-width:100%;min-width:0}
+.bkrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;overflow-wrap:anywhere}
+.msg.warn{overflow-wrap:anywhere}
+.actions{flex-wrap:wrap;align-items:center;gap:6px}
+.grid td.actions{display:table-cell;white-space:normal;min-width:200px;max-width:none;width:100%;overflow:visible;vertical-align:middle}
+.grid td.actions .btn{margin:3px 6px 3px 0;vertical-align:middle}
+.tablewrap{max-width:100%}
+.sidebar .nav{overflow:hidden;text-overflow:ellipsis}
+.modal-actions{flex-wrap:wrap}
+.panel .toolbar{margin:8px 0}
+.updiff .msg{overflow-wrap:anywhere}
+.details,.pemetaan{max-width:100%}
+.pemetaan summary{overflow-wrap:anywhere}
+/* kartu info */
+.infocard h4{margin:14px 0 6px;font-size:13px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+.igrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.ir{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;min-width:0}
+.ir span{font-size:12px;color:var(--mute)}.ir b{font-weight:600;overflow-wrap:anywhere}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+
+/* tombol pilihan Monitoring + lencana CO ADS + pilihan mode upload */
+.montabs,.upmode{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.montabs button,.upmode button{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:transparent;color:inherit;cursor:pointer;font:inherit;font-weight:600}
+.montabs button i{font-style:normal;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--line)}
+.montabs button.on,.upmode button.on{background:var(--accent,#4f46e5);border-color:var(--accent,#4f46e5);color:#fff}
+.montabs button.on i{background:rgba(255,255,255,.25)}
+.kind-coads{margin-left:8px;background:#fde68a;color:#78350f;font-size:10px;font-weight:800}
+.modal p{white-space:pre-line}
+.ok-ic{color:var(--ok);display:inline-flex;vertical-align:middle}.warn-ic{color:#b45309;display:inline-flex;align-items:center;gap:3px;vertical-align:middle;font-size:12px}

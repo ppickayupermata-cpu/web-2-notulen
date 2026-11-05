@@ -20,3 +20,19 @@ export const INPUT_COLS = [
   { key: 'kirim', label: 'TANGGAL PENGIRIMAN', type: 'date' },
 ]
 export const ALL_COLS = [...INFO_COLS, ...INPUT_COLS]
+
+// Packing list CO ADS: kolom tabel yang tampil (memakai field yang sama dengan container biasa: po = DSA PO, so = KP SO, material = Wood Species)
+export const CO_ADS_COLS = [
+  { key: 'no', label: 'NO' },
+  { key: 'po', label: 'DSA PO NUMBER' },
+  { key: 'so', label: 'KP SO NUMBER' },
+  { key: 'productName', label: 'PRODUCT DESCRIPTION' },
+  { key: 'type', label: 'TYPE' },
+  { key: 'size', label: 'SIZE' },
+  { key: 'material', label: 'WOOD SPECIES' },
+  { key: 'qty', label: 'QTY' },
+  { key: 'uom', label: 'UoM' },
+  ...INPUT_COLS,
+]
+export const isCoAds = (g) => g?.kind === 'coads'
+export const colsFor = (g) => (isCoAds(g) ? CO_ADS_COLS : ALL_COLS)

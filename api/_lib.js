@@ -2,6 +2,7 @@
 import { neon } from '@neondatabase/serverless'
 import { createHmac, timingSafeEqual, randomUUID } from 'node:crypto'
 export { randomUUID }
+export { tanggalPulih } from './_pulih.js'
 export class PublicError extends Error {}
 
 // ---------- database ----------
@@ -40,6 +41,8 @@ export function ensureDb() {
           title text default '', created_by text, created_at timestamptz not null default now(), closed boolean not null default false)`,
       db`create table if not exists absen_log (seq bigserial, id text primary key, room_id text not null references absen_rooms(id) on delete cascade,
           nama text not null, bagian text not null, k text not null, at timestamptz not null default now(), unique (room_id, k))`,
+      db`alter table backups add column if not exists kind text not null default 'ganti'`,
+      db`alter table groups add column if not exists kind text not null default ''`,
       db`alter table absen_log add column if not exists confirmed boolean not null default false`,
       db`alter table absen_log add column if not exists confirmed_at timestamptz`,
     ]).catch((e) => { ready = null; throw e })
@@ -47,6 +50,19 @@ export function ensureDb() {
   return ready
 }
 
+// Cadangan satu container (header + semua baris beserta isian & tag packing). Dipanggil SEBELUM aksi yang menghapus / menimpa data.
+// kind: ganti | hapus | gabung | sebelum-pulih. Disimpan 8 terakhir per container.
+export async function backupStmts(db, gid, by, kind) {
+  const [g] = await db`select container, buyer, packing_list_no, ship_date, status, revision, added_at, kind from groups where id = ${gid}`
+  if (!g) return []
+  const rows = await db`select data from rows where group_id = ${gid} order by seq`
+  if (!rows.length) return []
+  const payload = { group: { buyer: g.buyer, packingListNo: g.packing_list_no, shipDate: g.ship_date, status: g.status, revision: g.revision, addedAt: g.added_at, kind: g.kind || '' }, rows: rows.map((x) => ({ data: x.data })) }
+  return [
+    db`insert into backups(id, container, by, n, kind, payload) values (${randomUUID()}, ${g.container}, ${by}, ${rows.length}, ${kind}, ${JSON.stringify(payload)}::jsonb)`,
+    db`delete from backups where container = ${g.container} and id not in (select id from backups where container = ${g.container} order by at desc limit 8)`,
+  ]
+}
 export const clip = (v, n = 200) => String(v ?? '').slice(0, n)
 export const todayTZ = () => new Date().toLocaleDateString('sv-SE', { timeZone: process.env.APP_TZ || 'Asia/Jakarta' })
 export const logQ = (db, type, by, detail) =>
@@ -90,21 +106,21 @@ export function verifyToken(req) {
 export async function loadAll() {
   const db = getSql()
   const [g, r, s, l, st, bk, sn] = await Promise.all([
-    db`select id, container, buyer, packing_list_no, ship_date, status, revision, added_at from groups order by seq`,
+    db`select id, container, buyer, packing_list_no, ship_date, status, revision, added_at, kind from groups order by seq`,
     db`select id, group_id, data from rows order by seq`,
     db`select id, kind, group_id, row_ids, label, run_on, created_by, created_at from schedules order by run_on`,
     db`select id, at, type, actor, detail from logs order by at desc limit 500`,
     db`select value from settings where key = 'main'`,
-    db`select id, container, at, by, n from backups order by at desc limit 20`,
+    db`select id, container, at, by, n, kind, payload->'group' as g from backups order by at desc limit 30`,
     db`select id, at, kind, by, n_groups, n_rows from snapshots order by at desc limit 20`,
   ])
   return {
-    groups: g.map((x) => ({ id: x.id, container: x.container, buyer: x.buyer, packingListNo: x.packing_list_no, shipDate: x.ship_date, status: x.status, revision: x.revision, addedAt: x.added_at })),
+    groups: g.map((x) => ({ id: x.id, container: x.container, buyer: x.buyer, packingListNo: x.packing_list_no, shipDate: x.ship_date, status: x.status, revision: x.revision, addedAt: x.added_at, kind: x.kind || '' })),
     rows: r.map((x) => ({ ...x.data, id: x.id, groupId: x.group_id })),
     schedules: s.map((x) => ({ id: x.id, kind: x.kind, groupId: x.group_id, rowIds: x.row_ids || [], label: x.label, date: x.run_on, by: x.created_by, createdAt: x.created_at })),
     logs: l.map((x) => ({ id: x.id, at: x.at, type: x.type, by: x.actor, detail: x.detail })),
     settings: { autoDelete: true, months: 1, ...(st[0]?.value || {}) },
-    backups: bk.map((x) => ({ id: x.id, container: x.container, at: x.at, by: x.by, count: x.n })),
+    backups: bk.map((x) => ({ id: x.id, container: x.container, at: x.at, by: x.by, count: x.n, kind: x.kind, group: x.g || {} })),
     snapshots: sn.map((x) => ({ id: x.id, at: x.at, kind: x.kind, by: x.by, groups: x.n_groups, rows: x.n_rows })), // cadangan penuh database (isi tidak ikut dikirim)
     // cadangan sebelum "Ganti semua" (isi tidak ikut dikirim)
   }
@@ -124,7 +140,7 @@ export async function pastikanLive(db, groupId) {
 // Seluruh container, baris (beserta isian & tag packing), jadwal, dan pengaturan. Disimpan 14 terakhir di database yang sama.
 export async function snapshot(db, kind = 'harian', by = 'Sistem') {
   const [g, r, s, st] = await Promise.all([
-    db`select id, container, buyer, packing_list_no, ship_date, status, revision, added_at from groups order by seq`,
+    db`select id, container, buyer, packing_list_no, ship_date, status, revision, added_at, kind from groups order by seq`,
     db`select id, group_id, data from rows order by seq`,
     db`select id, kind, group_id, row_ids, label, run_on, created_by, created_at from schedules order by run_on`,
     db`select value from settings where key = 'main'`,
@@ -158,7 +174,7 @@ export async function sweep() {
   for (const s of due) {
     if (s.kind === 'container') {
       const [g] = await db`select id, container, buyer from groups where id = ${s.group_id}`
-      if (g) stmts.push(db`delete from groups where id = ${g.id}`, logQ(db, 'hapus', 'Sistem', `Hapus terjadwal (${s.run_on}): ${s.label} · Buyer ${g.buyer || '-'}`))
+      if (g) stmts.push(...await backupStmts(db, g.id, 'Sistem', 'hapus'), db`delete from groups where id = ${g.id}`, logQ(db, 'hapus', 'Sistem', `Hapus terjadwal (${s.run_on}): ${s.label} · Buyer ${g.buyer || '-'}`))
     } else {
       const ids = JSON.stringify(s.row_ids || [])
       const [c] = await db`select count(*)::int as n from rows where id in (select jsonb_array_elements_text(${ids}::jsonb))`
@@ -175,7 +191,7 @@ export async function sweep() {
       from groups g where g.added_at::date + make_interval(months => ${cfg.months}) <= ${t}::date
       and not exists (select 1 from schedules s where s.kind = 'container' and s.group_id = g.id)`
     for (const g of old) {
-      stmts.push(db`delete from groups where id = ${g.id}`,
+      stmts.push(...await backupStmts(db, g.id, 'Sistem', 'hapus'), db`delete from groups where id = ${g.id}`,
         logQ(db, 'hapus', 'Sistem', `Hapus otomatis (lebih dari ${cfg.months} bulan): Container ${g.container} · Buyer ${g.buyer || '-'} · ${g.n} baris`))
     }
   }

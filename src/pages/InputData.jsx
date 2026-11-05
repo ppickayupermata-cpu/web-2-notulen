@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import FilterBar, { GROUP_FIELDS, ITEM_FIELDS } from '../components/FilterBar.jsx'
+import FilterBar, { GROUP_FIELDS, ITEM_FIELDS, ITEM_FIELDS_COADS } from '../components/FilterBar.jsx'
 import GroupList from '../components/GroupList.jsx'
 import DataTable from '../components/DataTable.jsx'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { filterGroups, filterRows } from '../utils/filter.js'
-import { ALL_COLS } from '../config.js'
+import { colsFor, isCoAds } from '../config.js'
 import Notulen from '../components/Notulen.jsx'
 import { Undo2, Save, X, ArrowLeft, Filter } from 'lucide-react'
 
@@ -14,7 +14,6 @@ const I0 = { so: '', soItem: '', productCode: '' }
 
 export default function InputData({ groupId, onBack }) {
   const { rows, groups, applyChanges, ask } = useData()
-  const editable = ALL_COLS.map((c) => c.key)
   const { confirm, dialog } = useConfirm()
   const [f, setF] = useState(G0)              // cari container & buyer (daftar)
   const [fi, setFi] = useState(I0)            // cari SO, SO item, product code (di dalam container)
@@ -29,6 +28,7 @@ export default function InputData({ groupId, onBack }) {
   const calcRef = useRef(null) // fungsi hitung rumus dari tabel, dipakai notulen
 
   const open = groups.find((g) => g.id === openId)
+  const cols = colsFor(open), editable = cols.map((c) => c.key)   // CO ADS: hanya kolom NO ... UoM + AREA ... TANGGAL PENGIRIMAN
   // Live: kursor admin + isian yang BELUM di-Submit dikirim (tertunda 0,35 dtk, denyut 6 dtk) agar tampilan live menunjukkannya langsung
   const [cursor, setCursor] = useState(null), pres = useRef({})
   pres.current = { groupId: openId, rowId: cursor?.rowId, key: cursor?.key, editing: !!cursor?.editing, draft }
@@ -98,8 +98,8 @@ export default function InputData({ groupId, onBack }) {
           <button className="btn" onClick={cancel} disabled={!changed}><X size={15} /> Batal</button>
           {msg && <span className="msg ok">{msg}</span>}
         </div>
-        {showFilter && <FilterBar fields={ITEM_FIELDS} value={fi} onChange={setFi} onClear={() => setFi(I0)} />}
-        <DataTable fileName={`Container-${open.container}`} rows={shown} manage groupId={open.id} editable={editable} editing={editing} compactTools leadExtras={<button className={'btn sm' + (showFilter ? ' on' : '')} aria-pressed={showFilter} onClick={() => setShowFilter((v) => !v)} title="Tampilkan / sembunyikan filter SO, SO Item, Product Code"><Filter size={14} /> Filter{Object.values(fi).some(Boolean) ? ' •' : ''}</button>} getValue={getValue} onChange={change} onChangeMany={changeMany} onCursor={setCursor} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={tagPacking} />
+        {showFilter && <FilterBar fields={isCoAds(open) ? ITEM_FIELDS_COADS : ITEM_FIELDS} value={fi} onChange={setFi} onClear={() => setFi(I0)} />}
+        <DataTable fileName={`Container-${open.container}`} cols={cols} rows={shown} manage groupId={open.id} editable={editable} editing={editing} compactTools leadExtras={<button className={'btn sm' + (showFilter ? ' on' : '')} aria-pressed={showFilter} onClick={() => setShowFilter((v) => !v)} title="Tampilkan / sembunyikan filter SO, SO Item, Product Code"><Filter size={14} /> Filter{Object.values(fi).some(Boolean) ? ' •' : ''}</button>} getValue={getValue} onChange={change} onChangeMany={changeMany} onCursor={setCursor} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={tagPacking} />
         {nt && <Notulen calc={calcRef.current} group={open} rows={rows.filter((r) => r.groupId === open.id)} onClose={() => setNt(false)} />}
         {dialog}
       </div>

@@ -12,11 +12,11 @@ const isN = (x) => x !== '' && x != null && Number.isFinite(Number(x))
 const show = (c, v) => (c.type === 'date' && v && !String(v).startsWith('#') ? String(v).split('-').reverse().join('/') : v)
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch { return d } }
 
-export default function DataTable({ rows, editable = [], editing = false, getValue, onChange, selectable = false, selected = [], onToggle, onToggleAll, fileName, manage = false, groupId, onNotulen, onPack, compactTools = false, onChangeMany, leadExtras = null, onCursor }) {
+export default function DataTable({ rows, cols: baseCols, editable = [], editing = false, getValue, onChange, selectable = false, selected = [], onToggle, onToggleAll, fileName, manage = false, groupId, onNotulen, onPack, compactTools = false, onChangeMany, leadExtras = null, onCursor }) {
   const { settings, setSettings, addRows, removeRows, rows: allRows, cellHistory, applyChanges } = useData()
   const { confirm, dialog } = useConfirm()
   const extra = (settings.cols || []).map((c) => ({ ...c, type: 'text' }))
-  const all = [...ALL_COLS, ...extra]
+  const all = [...(baseCols || ALL_COLS), ...extra]
   const edt = manage ? [...editable, ...extra.map((c) => c.key)] : editable
   const [hc, setHc] = useState([]); const [hr, setHr] = useState([])
   const [menu, setMenu] = useState(false)
@@ -369,7 +369,7 @@ export default function DataTable({ rows, editable = [], editing = false, getVal
                   return (
                   <tr key={r.id} className={(selected.includes(r.id) ? 'picked' : '') + (r.packed ? ' packed' : '')}>
                     {onPack && <td className="pk lpk">{pk}</td>}
-                    <td className="rn" style={{ left: LP }} onMouseDown={(e) => { if (e.target.closest('button')) return; setSel(e.shiftKey && sel ? { a: sel.a, b: [i, cols.length - 1] } : { a: [i, 0], b: [i, cols.length - 1] }); setDrag(true) }}><span>{idx.get(r.id) + 1}</span><button className="mini" title="Sembunyikan baris" onClick={() => setHr((h) => [...h, r.id])}><Eye size={13} /></button></td>
+                    <td className="rn" style={{ left: LP }} onMouseDown={(e) => { if (e.target.closest('button')) return; setSel(e.shiftKey && sel ? { a: sel.a, b: [i, cols.length - 1] } : { a: [i, 0], b: [i, cols.length - 1] }); setDrag(true) }}><span>{idx.get(r.id) + 1}</span>{r.label && <i className={'lbl lbl-' + r.label} title={r.label === 'old' ? 'Data lama' : 'Data baru'}>{r.label}</i>}<button className="mini" title="Sembunyikan baris" onClick={() => setHr((h) => [...h, r.id])}><Eye size={13} /></button></td>
                     {selectable && <td><input type="checkbox" className="chk" checked={selected.includes(r.id)} onChange={() => onToggle(r.id)} /></td>}
                     {cols.map((c, ci) => {
                       if (covered.has(i + ',' + ci)) return null

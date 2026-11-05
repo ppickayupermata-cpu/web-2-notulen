@@ -3,6 +3,11 @@ export const ITEM_FIELDS = [
   { key: 'soItem', label: 'SO Item', placeholder: 'Contoh: 10' },
   { key: 'productCode', label: 'Product Code (opsional)', placeholder: 'Contoh: DSA24868' },
 ]
+export const ITEM_FIELDS_COADS = [
+  { key: 'so', label: 'KP SO Number', placeholder: 'Ketik nomor SO...' },
+  { key: 'po', label: 'DSA PO Number', placeholder: 'Contoh: 24764' },
+  { key: 'productName', label: 'Product Description', placeholder: 'Contoh: Alexandria' },
+]
 export const GROUP_FIELDS = [
   { key: 'container', label: 'Container', placeholder: 'Ketik nomor container...' },
   { key: 'buyer', label: 'Buyer', placeholder: 'Contoh: AAW' },

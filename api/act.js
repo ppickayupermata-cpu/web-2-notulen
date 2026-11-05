@@ -1,7 +1,8 @@
-import { pastikanLive, randomUUID, snapshot, getSql, ensureDb, verifyToken, readBody, send, fail, clip, todayTZ, logQ } from './_lib.js'
+import { pastikanLive, randomUUID, snapshot, backupStmts, tanggalPulih, getSql, ensureDb, verifyToken, readBody, send, fail, clip, todayTZ, logQ } from './_lib.js'
 
 const STAGES = ['area', 'target', 'ket', 'kirim']
-const INFO = ['productCode', 'productName', 'po', 'so', 'soItem', 'material', 'type', 'size', 'qty', 'uom', 'group']
+const INFO = ['productCode', 'productName', 'po', 'so', 'soItem', 'material', 'type', 'size', 'qty', 'uom', 'group', 'no']
+const kindOf = (v) => (v === 'coads' ? 'coads' : '') // jenis container: '' = biasa, 'coads' = packing list CO ADS
 const EDIT = new Set([...INFO, ...STAGES])
 const ids = (a) => JSON.stringify((Array.isArray(a) ? a : []).slice(0, 5000).map(String))
 
@@ -74,16 +75,21 @@ export default async function handler(req, res) {
         const [sn] = await db`select id, at, payload from snapshots where id = ${String(b.id)}`
         if (!sn) return send(res, 404, { error: 'Cadangan tidak ditemukan (mungkin sudah dibuang).' })
         await snapshot(db, 'sebelum-pulih', user.username)
-        const { groups = [], rows = [], schedules = [] } = sn.payload || {}
+        const payload = sn.payload || {}, t = todayTZ()
+        const [st] = await db`select value from settings where key = 'main'`, cfg = { autoDelete: true, months: 1, ...(st?.value || {}) }
+        // tanggal upload yang sudah lewat batas hapus otomatis dimulai lagi dari hari ini, dan jadwal hapus yang sudah jatuh tempo tidak ikut dipulihkan;
+        // keduanya akan langsung menghapus data yang baru dipulihkan pada pembersihan berikutnya
+        const groups = (payload.groups || []).map((g) => ({ ...g, added_at: tanggalPulih(g.added_at, cfg, t) }))
+        const rows = payload.rows || [], schedules = (payload.schedules || []).filter((x) => String(x.run_on || '') > t)
         const gids = JSON.stringify(groups.map((g) => g.id))
         await db.transaction([
           db`delete from groups where id not in (select jsonb_array_elements_text(${gids}::jsonb))`,
           db`delete from rows where group_id in (select jsonb_array_elements_text(${gids}::jsonb))`,
           db`delete from schedules`,
-          db`insert into groups(id, container, buyer, packing_list_no, ship_date, status, revision, added_at)
-             select x.id, x.container, x.buyer, x.packing_list_no, x.ship_date, x.status, x.revision, x.added_at
-             from jsonb_to_recordset(${JSON.stringify(groups)}::jsonb) as x(id text, container text, buyer text, packing_list_no text, ship_date text, status text, revision text, added_at text)
-             on conflict (id) do update set container = excluded.container, buyer = excluded.buyer, packing_list_no = excluded.packing_list_no, ship_date = excluded.ship_date, status = excluded.status, revision = excluded.revision, added_at = excluded.added_at`,
+          db`insert into groups(id, container, buyer, packing_list_no, ship_date, status, revision, added_at, kind)
+             select x.id, x.container, x.buyer, x.packing_list_no, x.ship_date, x.status, x.revision, x.added_at, coalesce(x.kind, '')
+             from jsonb_to_recordset(${JSON.stringify(groups)}::jsonb) as x(id text, container text, buyer text, packing_list_no text, ship_date text, status text, revision text, added_at text, kind text)
+             on conflict (id) do update set container = excluded.container, buyer = excluded.buyer, packing_list_no = excluded.packing_list_no, ship_date = excluded.ship_date, status = excluded.status, revision = excluded.revision, added_at = excluded.added_at, kind = excluded.kind`,
           db`insert into rows(id, group_id, data) select x.id, x.group_id, x.data from jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) as x(id text, group_id text, data jsonb)`,
           db`insert into schedules(id, kind, group_id, row_ids, label, run_on, created_by, created_at)
              select x.id, x.kind, x.group_id, x.row_ids, x.label, x.run_on, x.created_by, x.created_at
@@ -118,40 +124,87 @@ export default async function handler(req, res) {
         const [g] = await db`select id, container from groups where id = ${String(b.groupId)}`
         if (!g) return send(res, 400, { error: 'Container tidak ditemukan.' })
         const pick = (r) => { const d = {}; INFO.forEach((k) => { d[k] = clip(r?.[k]) }); return d }
-        const ins = (Array.isArray(b.insert) ? b.insert : []).slice(0, 2000).map((r) => { const data = pick(r); STAGES.forEach((k) => { data[k] = '' }); return { id: randomUUID(), data } })
+        const ins = (Array.isArray(b.insert) ? b.insert : []).slice(0, 2000).map((r) => { const data = pick(r); STAGES.forEach((k) => { data[k] = '' }); data.label = 'new'; return { id: randomUUID(), data } })
         const upd = (Array.isArray(b.update) ? b.update : []).slice(0, 2000).filter((r) => r?.id).map((r) => ({ id: String(r.id), patch: pick(r) }))
         const del = ids(b.remove)   // baris lama yang tidak ada di file baru dan dipilih untuk dihapus (hanya di container ini)
         const nDel = (Array.isArray(b.remove) ? b.remove : []).length
-        if (!ins.length && !upd.length && !nDel) return send(res, 200, { ok: true, inserted: 0, updated: 0, removed: 0 })
-        const stmts = []
+        if (!ins.length && !upd.length && !nDel) return send(res, 200, { ok: true, inserted: 0, updated: 0, removed: 0, kept: 0 })
+        const [{ n: nLama }] = await db`select count(*)::int as n from rows where group_id = ${g.id}`
+        const stmts = await backupStmts(db, g.id, user.username, 'gabung') // cadangan container sebelum digabung (bisa dibatalkan dari halaman Upload)
+        // semua baris yang sudah ada sebelum penggabungan ini diberi label OLD; baris yang ditambahkan sekarang berlabel NEW
+        stmts.push(db`update rows set data = data || '{"label":"old"}'::jsonb where group_id = ${g.id}`)
         if (nDel) stmts.push(db`delete from rows where group_id = ${g.id} and id in (select jsonb_array_elements_text(${del}::jsonb))`)
         if (ins.length) stmts.push(db`insert into rows(id, group_id, data) select x.id, ${g.id}::text, x.data from jsonb_to_recordset(${JSON.stringify(ins)}::jsonb) as x(id text, data jsonb)`)
         if (upd.length) stmts.push(db`update rows r set data = r.data || x.patch from jsonb_to_recordset(${JSON.stringify(upd)}::jsonb) as x(id text, patch jsonb) where r.id = x.id and r.group_id = ${g.id}`)
         stmts.push(logQ(db, 'upload', user.username, `${clip(b.fileName, 120) || 'file'} — Container ${g.container}: +${ins.length} baris baru, ${upd.length} diperbarui, ${nDel} dihapus`))
         await db.transaction(stmts)
-        return send(res, 200, { ok: true, inserted: ins.length, updated: upd.length, removed: nDel })
+        return send(res, 200, { ok: true, inserted: ins.length, updated: upd.length, removed: nDel, kept: Math.max(0, nLama - nDel) })
       }
-      case 'restoreBackup': { // batalkan "Ganti semua": kembalikan container beserta semua isian dan tag packing dari cadangan di server
+      case 'backupInfo': { // isi lengkap satu cadangan container (baris + header) untuk halaman Data Pulihan dan kartu info
+        const [bk] = await db`select id, container, at, by, n, kind, payload from backups where id = ${String(b.id)}`
+        if (!bk) return send(res, 404, { error: 'Cadangan tidak ditemukan (mungkin sudah dibuang).' })
+        const { group = {}, rows = [] } = bk.payload || {}
+        return send(res, 200, { id: bk.id, container: bk.container, at: bk.at, by: bk.by, kind: bk.kind, group, rows: rows.slice(0, 5000).map((r) => r.data || {}) })
+      }
+      case 'snapshotInfo': { // ringkasan cadangan penuh: tiap container beserta jumlah baris, isian, dan tag packing
+        const [sn] = await db`select id, at, kind, by, payload from snapshots where id = ${String(b.id)}`
+        if (!sn) return send(res, 404, { error: 'Cadangan tidak ditemukan (mungkin sudah dibuang).' })
+        const { groups = [], rows = [], schedules = [] } = sn.payload || {}
+        const per = new Map(groups.map((g) => [g.id, { n: 0, packed: 0, isi: 0 }]))
+        for (const r of rows) { const c = per.get(r.group_id); if (!c) continue; const d = r.data || {}; c.n++; if (d.packed) c.packed++; if (['area', 'target', 'ket', 'kirim'].some((k) => String(d[k] ?? '').trim())) c.isi++ }
+        return send(res, 200, { id: sn.id, at: sn.at, kind: sn.kind, by: sn.by, jadwal: schedules.length,
+          groups: groups.map((g) => ({ container: g.container, buyer: g.buyer, packingListNo: g.packing_list_no, shipDate: g.ship_date, status: g.status, addedAt: g.added_at, ...per.get(g.id) })) })
+      }
+      case 'clearLabels': { // hapus label old / new di satu container
+        const gid = String(b.groupId || '')
+        await db`update rows set data = data - 'label' where group_id = ${gid}`
+        return send(res, 200, { ok: true })
+      }
+      case 'moveRows': { // masukkan data lama ke container baru: isi baris yang cocok (fill) dan/atau tambah baris yang belum ada (insert); rencana disusun di browser
+        const [from] = await db`select id, container from groups where id = ${String(b.fromId)}`
+        const [to] = await db`select id, container from groups where id = ${String(b.toId)}`
+        if (!from || !to || from.id === to.id) return send(res, 400, { error: 'Container asal atau tujuan tidak valid.' })
+        const okKey = (k) => EDIT.has(k) || /^x\d{1,2}$/.test(k)
+        const clean = (o) => { const d = {}; for (const [k, v] of Object.entries(o || {})) if (okKey(k)) d[k] = clip(v, k === 'ket' ? 300 : 80); else if (k === 'packed') d.packed = clip(v, 40); return d }
+        const ins = (Array.isArray(b.insert) ? b.insert : []).slice(0, 3000).map((r) => { const data = clean(r); INFO.concat(STAGES).forEach((k) => { data[k] ??= '' }); data.label = 'old'; return { id: randomUUID(), data } })
+        const fill = (Array.isArray(b.fill) ? b.fill : []).slice(0, 3000).filter((r) => r?.id).map((r) => ({ id: String(r.id), patch: clean(r.patch) })).filter((r) => Object.keys(r.patch).length)
+        const rem = (Array.isArray(b.removeFrom) ? b.removeFrom : []).map(String)
+        if (!ins.length && !fill.length && !rem.length) return send(res, 200, { ok: true, inserted: 0, filled: 0, removed: 0 })
+        const stmts = [...await backupStmts(db, to.id, user.username, 'gabung'), ...(rem.length ? await backupStmts(db, from.id, user.username, 'hapus') : [])]
+        stmts.push(db`update rows set data = data || '{"label":"new"}'::jsonb where group_id = ${to.id}`)   // isi container tujuan sebelum ini = NEW
+        if (ins.length) stmts.push(db`insert into rows(id, group_id, data) select x.id, ${to.id}::text, x.data from jsonb_to_recordset(${JSON.stringify(ins)}::jsonb) as x(id text, data jsonb)`)
+        if (fill.length) stmts.push(db`update rows r set data = r.data || x.patch from jsonb_to_recordset(${JSON.stringify(fill)}::jsonb) as x(id text, patch jsonb) where r.id = x.id and r.group_id = ${to.id}`)
+        if (rem.length) stmts.push(db`delete from rows where group_id = ${from.id} and id in (select jsonb_array_elements_text(${JSON.stringify(rem)}::jsonb))`)
+        stmts.push(logQ(db, 'upload', user.username, `Data lama Container ${from.container} → Container ${to.container}: +${ins.length} baris (old), ${fill.length} baris diisi${rem.length ? `, ${rem.length} dihapus dari container lama` : ''}`))
+        await db.transaction(stmts)
+        return send(res, 200, { ok: true, inserted: ins.length, filled: fill.length, removed: rem.length })
+      }
+      case 'restoreBackup': { // kembalikan container dari cadangan di server. Isi container sekarang dicadangkan dulu; cadangan yang dipakai TIDAK dibuang.
         const [bk] = await db`select id, container, payload from backups where id = ${String(b.id)}`
         if (!bk) return send(res, 404, { error: 'Cadangan tidak ditemukan (mungkin sudah dibuang).' })
-        const { group: g, rows: input } = bk.payload
+        const { group: g = {}, rows: input = [] } = bk.payload || {}
+        if (!input.length) return send(res, 400, { error: 'Cadangan ini kosong, tidak ada yang bisa dipulihkan.' })
+        const [st] = await db`select value from settings where key = 'main'`, cfg = { autoDelete: true, months: 1, ...(st?.value || {}) }
         const gid = randomUUID(), rows = input.map((r) => ({ id: randomUUID(), data: r.data }))
         const stmts = []
-        for (const o of await db`select id from groups where container = ${bk.container}`) stmts.push(db`delete from schedules where group_id = ${o.id}`, db`delete from groups where id = ${o.id}`)
+        for (const o of await db`select id from groups where container = ${bk.container}`) {
+          stmts.push(...await backupStmts(db, o.id, user.username, 'sebelum-pulih'))   // data yang sedang tampil tidak hilang tanpa jejak
+          stmts.push(db`delete from schedules where group_id = ${o.id}`, db`delete from groups where id = ${o.id}`)
+        }
         stmts.push(
-          db`insert into groups(id, container, buyer, packing_list_no, ship_date, status, revision, added_at) values (${gid}, ${bk.container}, ${clip(g.buyer)}, ${clip(g.packingListNo)}, ${clip(g.shipDate)}, ${clip(g.status)}, ${clip(g.revision)}, ${g.addedAt || todayTZ()})`,
+          db`insert into groups(id, container, buyer, packing_list_no, ship_date, status, revision, added_at, kind) values (${gid}, ${bk.container}, ${clip(g.buyer)}, ${clip(g.packingListNo)}, ${clip(g.shipDate)}, ${clip(g.status)}, ${clip(g.revision)}, ${tanggalPulih(g.addedAt, cfg, todayTZ())}, ${kindOf(g.kind)})`,
           db`insert into rows(id, group_id, data) select x.id, ${gid}::text, x.data from jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) as x(id text, data jsonb)`,
-          db`delete from backups where id = ${bk.id}`,
-          logQ(db, 'upload', user.username, `Pemulihan data lama: Container ${bk.container} · ${rows.length} baris`),
+          logQ(db, 'upload', user.username, `Pemulihan data: Container ${bk.container} · ${rows.length} baris`),
         )
         await db.transaction(stmts)
-        return send(res, 200, { ok: true })
+        return send(res, 200, { ok: true, container: bk.container, rows: rows.length })
       }
       case 'dropBackup': {await db`delete from backups where id = ${String(b.id)}`; return send(res, 200, { ok: true }) }
       case 'addGroup': {
         const g = b.group || {}, input = Array.isArray(b.rows) ? b.rows : []
         const container = clip(g.container, 60).trim()
         if (!container || !input.length) return send(res, 400, { error: 'Container atau isi packing list kosong.' })
+        if (b.mode === 'baru' && (await db`select 1 from groups where container = ${container}`).length) return send(res, 400, { error: `Nomor container ${container} sudah dipakai. Isi nama container baru yang berbeda.` })
         const gid = randomUUID()
         const rows = input.map((r) => {
           const data = {}
@@ -161,18 +214,14 @@ export default async function handler(req, res) {
         })
         const stmts = []
         const old = await db`select id from groups where container = ${container}`
-        for (const o of old) {
-          // cadangan penuh (header + semua baris beserta isian & tag packing) sebelum diganti; disimpan 5 terakhir per container
-          const [og] = await db`select container, buyer, packing_list_no, ship_date, status, revision, added_at from groups where id = ${o.id}`
-          const orows = await db`select data from rows where group_id = ${o.id} order by seq`
-          stmts.push(db`insert into backups(id, container, by, n, payload) values (${randomUUID()}, ${container}, ${user.username}, ${orows.length}, ${JSON.stringify({ group: { buyer: og.buyer, packingListNo: og.packing_list_no, shipDate: og.ship_date, status: og.status, revision: og.revision, addedAt: og.added_at }, rows: orows.map((x) => ({ data: x.data })) })}::jsonb)`,
-            db`delete from backups where container = ${container} and id not in (select id from backups where container = ${container} order by at desc limit 5)`)
+        for (const o of old) {   // cadangan penuh (header + semua baris beserta isian & tag packing) sebelum diganti
+          stmts.push(...await backupStmts(db, o.id, user.username, 'ganti'))
           stmts.push(db`delete from schedules where group_id = ${o.id}`, db`delete from groups where id = ${o.id}`,
             logQ(db, 'hapus', user.username, `Diganti upload baru: Container ${container}`))
         }
         stmts.push(
-          db`insert into groups(id, container, buyer, packing_list_no, ship_date, status, revision, added_at)
-             values (${gid}, ${container}, ${clip(g.buyer)}, ${clip(g.packingListNo)}, ${clip(g.shipDate)}, ${clip(g.status)}, ${clip(g.revision)}, ${todayTZ()})`,
+          db`insert into groups(id, container, buyer, packing_list_no, ship_date, status, revision, added_at, kind)
+             values (${gid}, ${container}, ${clip(g.buyer)}, ${clip(g.packingListNo)}, ${clip(g.shipDate)}, ${clip(g.status)}, ${clip(g.revision)}, ${todayTZ()}, ${kindOf(g.kind)})`,
           db`insert into rows(id, group_id, data)
              select x.id, ${gid}::text, x.data from jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) as x(id text, data jsonb)`,
           logQ(db, 'upload', user.username, `${clip(b.fileName, 120) || 'file'} — Container ${container} · Buyer ${clip(g.buyer) || '-'} · ${rows.length} baris`),
@@ -184,6 +233,7 @@ export default async function handler(req, res) {
       case 'removeGroup': {
         const [g] = await db`select id, container, buyer, (select count(*) from rows where group_id = groups.id)::int as n from groups where id = ${String(b.id)}`
         if (g) await db.transaction([
+          ...await backupStmts(db, g.id, user.username, 'hapus'),   // bisa dipulihkan dari halaman Upload Excel / Cadangan
           db`delete from schedules where group_id = ${g.id}`, db`delete from groups where id = ${g.id}`,
           logQ(db, 'hapus', user.username, `${clip(b.reason, 60) || 'Hapus manual'}: Container ${g.container} · Buyer ${g.buyer || '-'} · ${g.n} baris`),
         ])
@@ -194,7 +244,10 @@ export default async function handler(req, res) {
         const list = ids(b.ids)
         const gone = await db`select distinct data->>'so' as so from rows where id in (select jsonb_array_elements_text(${list}::jsonb))`
         const [c] = await db`select count(*)::int as n from rows where id in (select jsonb_array_elements_text(${list}::jsonb))`
+        const hit = c.n ? await db`select distinct group_id from rows where id in (select jsonb_array_elements_text(${list}::jsonb))` : []
+        const bk = []; for (const h of hit) bk.push(...await backupStmts(db, h.group_id, user.username, 'hapus'))
         if (c.n) await db.transaction([
+          ...bk,
           db`delete from rows where id in (select jsonb_array_elements_text(${list}::jsonb))`,
           db`delete from groups g where not exists (select 1 from rows r where r.group_id = g.id)`,
           logQ(db, 'hapus', user.username, `${clip(b.reason, 60) || 'Hapus manual'}: ${c.n} baris (SO ${gone.map((x) => x.so).join(', ')})`),
