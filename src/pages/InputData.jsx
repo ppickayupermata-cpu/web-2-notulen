@@ -6,6 +6,8 @@ import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { filterGroups, filterRows } from '../utils/filter.js'
 import { colsFor, isCoAds } from '../config.js'
+import { PackageCheck } from 'lucide-react'
+import { infoPindahSo } from '../utils/barangJadi.js'
 import Notulen from '../components/Notulen.jsx'
 import { Undo2, Save, X, ArrowLeft, Filter } from 'lucide-react'
 
@@ -13,7 +15,7 @@ const G0 = { container: '', buyer: '' }
 const I0 = { so: '', soItem: '', productCode: '' }
 
 export default function InputData({ groupId, onBack }) {
-  const { rows, groups, applyChanges, ask } = useData()
+  const { rows, groups, applyChanges, ask, finishRows } = useData()
   const { confirm, dialog } = useConfirm()
   const [f, setF] = useState(G0)              // cari container & buyer (daftar)
   const [fi, setFi] = useState(I0)            // cari SO, SO item, product code (di dalam container)
@@ -84,6 +86,23 @@ export default function InputData({ groupId, onBack }) {
   const penuh = !!open
   useEffect(() => { const c = document.querySelector('.content'); if (!penuh || !c) return; c.classList.add('fill'); return () => c.classList.remove('fill') }, [penuh])
 
+  // Simpan satu SO (semua barisnya di container ini) ke list Barang Jadi; tombol muncul di header setiap SO
+  const keBarangJadi = async (so) => {
+    if (changed) return setMsg('Submit atau Batal dulu perubahan yang belum disimpan, baru pindahkan SO.')
+    const i = infoPindahSo(rows, open.id, so)
+    if (!i.total) return
+    const detail = [`SO ${so}: ${i.total} baris dipindahkan dari Monitoring ke list Barang Jadi (tersimpan lengkap dengan isian dan tag packing).`,
+      i.belum ? `Perhatian: ${i.belum} dari ${i.total} baris belum ditandai dipacking.` : 'Semua baris sudah ditandai dipacking.',
+      i.containerKosong ? `Ini SO terakhir: Container ${open.container} akan kosong dan hilang dari Monitoring, termasuk link live dan data absensinya. Barisnya tetap aman di Barang Jadi.` : '',
+      'Cadangan dibuat otomatis, dan bisa dikembalikan dari tab Barang Jadi.'].filter(Boolean).join('\n')
+    if (!(await confirm({ title: 'Pindahkan ke Barang Jadi?', message: detail, confirmLabel: 'Pindahkan', danger: i.containerKosong || i.belum > 0 }))) return
+    const ok = await finishRows(open.id, i.ids)
+    if (!ok) return setMsg('Gagal memindahkan SO. Tidak ada yang diubah, coba lagi.')
+    setMsg(`SO ${so} (${i.total} baris) dipindahkan ke Barang Jadi.`)
+    if (i.containerKosong) { reset(); onBack ? onBack() : setOpenId(null) }
+  }
+  const soActions = [{ key: 'fg', label: 'Simpan ke list Barang Jadi', icon: <PackageCheck size={14} />, title: 'Pindahkan semua baris SO ini ke list Barang Jadi (tab Barang Jadi di Monitoring)', onClick: keBarangJadi }]
+
   // ---- Isi satu container: edit di sini ----
   if (open) {
     const shown = filterRows(rows.filter((r) => r.groupId === open.id), fi)
@@ -99,7 +118,7 @@ export default function InputData({ groupId, onBack }) {
           {msg && <span className="msg ok">{msg}</span>}
         </div>
         {showFilter && <FilterBar fields={isCoAds(open) ? ITEM_FIELDS_COADS : ITEM_FIELDS} value={fi} onChange={setFi} onClear={() => setFi(I0)} />}
-        <DataTable fileName={`Container-${open.container}`} cols={cols} rows={shown} manage groupId={open.id} editable={editable} editing={editing} compactTools leadExtras={<button className={'btn sm' + (showFilter ? ' on' : '')} aria-pressed={showFilter} onClick={() => setShowFilter((v) => !v)} title="Tampilkan / sembunyikan filter SO, SO Item, Product Code"><Filter size={14} /> Filter{Object.values(fi).some(Boolean) ? ' •' : ''}</button>} getValue={getValue} onChange={change} onChangeMany={changeMany} onCursor={setCursor} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={tagPacking} />
+        <DataTable fileName={`Container-${open.container}`} cols={cols} soActions={soActions} rows={shown} manage groupId={open.id} editable={editable} editing={editing} compactTools leadExtras={<button className={'btn sm' + (showFilter ? ' on' : '')} aria-pressed={showFilter} onClick={() => setShowFilter((v) => !v)} title="Tampilkan / sembunyikan filter SO, SO Item, Product Code"><Filter size={14} /> Filter{Object.values(fi).some(Boolean) ? ' •' : ''}</button>} getValue={getValue} onChange={change} onChangeMany={changeMany} onCursor={setCursor} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={tagPacking} />
         {nt && <Notulen calc={calcRef.current} group={open} rows={rows.filter((r) => r.groupId === open.id)} onClose={() => setNt(false)} />}
         {dialog}
       </div>

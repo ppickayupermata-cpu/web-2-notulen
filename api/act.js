@@ -155,6 +155,55 @@ export default async function handler(req, res) {
         return send(res, 200, { id: sn.id, at: sn.at, kind: sn.kind, by: sn.by, jadwal: schedules.length,
           groups: groups.map((g) => ({ container: g.container, buyer: g.buyer, packingListNo: g.packing_list_no, shipDate: g.ship_date, status: g.status, addedAt: g.added_at, ...per.get(g.id) })) })
       }
+      case 'finishRows': { // pindahkan baris terpilih (mis. satu SO) dari Monitoring ke daftar Barang Jadi
+        const [g] = await db`select id, container, buyer, packing_list_no, ship_date, status, revision, added_at, kind from groups where id = ${String(b.groupId)}`
+        if (!g) return send(res, 404, { error: 'Container tidak ditemukan.' })
+        const want = JSON.stringify([...new Set((Array.isArray(b.ids) ? b.ids : []).map(String))].slice(0, 5000))
+        const hit = await db`select id from rows where group_id = ${g.id} and id in (select jsonb_array_elements_text(${want}::jsonb))`
+        if (!hit.length) return send(res, 400, { error: 'Tidak ada baris yang bisa dipindahkan.' })
+        const list = JSON.stringify(hit.map((x) => x.id))
+        const [{ n: sisa }] = await db`select count(*)::int as n from rows where group_id = ${g.id} and id not in (select jsonb_array_elements_text(${list}::jsonb))`
+        await db.transaction([
+          ...await backupStmts(db, g.id, user.username, 'pindah'),   // bisa dikembalikan dari Barang Jadi atau Data Pulihan
+          db`insert into finished_groups(container, buyer, packing_list_no, ship_date, status, revision, kind, added_at) values (${g.container}, ${g.buyer}, ${g.packing_list_no}, ${g.ship_date}, ${g.status}, ${g.revision}, ${kindOf(g.kind)}, ${g.added_at})
+             on conflict (container) do update set buyer = excluded.buyer, packing_list_no = excluded.packing_list_no, ship_date = excluded.ship_date, status = excluded.status, revision = excluded.revision, kind = excluded.kind, updated_at = now()`,
+          db`insert into finished_rows(id, container, so, data, moved_by) select r.id, ${g.container}::text, coalesce(r.data->>'so', ''), r.data, ${user.username}::text from rows r
+             where r.group_id = ${g.id} and r.id in (select jsonb_array_elements_text(${list}::jsonb))
+             on conflict (id) do update set container = excluded.container, so = excluded.so, data = excluded.data, moved_at = now(), moved_by = excluded.moved_by`,
+          db`delete from rows where group_id = ${g.id} and id in (select jsonb_array_elements_text(${list}::jsonb))`,
+          db`delete from groups where id = ${g.id} and not exists (select 1 from rows where group_id = ${g.id})`,
+          logQ(db, 'barang', user.username, `Pindah ke Barang Jadi: Container ${g.container} · ${hit.length} baris${sisa ? '' : ' (container kosong, dihapus dari Monitoring)'}`),
+        ])
+        return send(res, 200, { ok: true, moved: hit.length, emptied: !sisa })
+      }
+      case 'unfinishRows': { // kembalikan baris Barang Jadi ke Monitoring (container dibuat lagi bila sudah tidak ada)
+        const container = String(b.container || '')
+        const [fg] = await db`select container, buyer, packing_list_no, ship_date, status, revision, kind from finished_groups where container = ${container}`
+        if (!fg) return send(res, 404, { error: 'Container tidak ada di Barang Jadi.' })
+        const want = JSON.stringify([...new Set((Array.isArray(b.ids) ? b.ids : []).map(String))].slice(0, 5000))
+        const hit = await db`select id from finished_rows where container = ${container} and id in (select jsonb_array_elements_text(${want}::jsonb))`
+        if (!hit.length) return send(res, 400, { error: 'Tidak ada baris yang bisa dikembalikan.' })
+        const list = JSON.stringify(hit.map((x) => x.id))
+        const [live] = await db`select id from groups where container = ${container}`
+        const gid = live?.id || randomUUID(), stmts = []
+        if (!live) stmts.push(db`insert into groups(id, container, buyer, packing_list_no, ship_date, status, revision, added_at, kind) values (${gid}, ${container}, ${fg.buyer}, ${fg.packing_list_no}, ${fg.ship_date}, ${fg.status}, ${fg.revision}, ${todayTZ()}, ${kindOf(fg.kind)})`)
+        else stmts.push(...await backupStmts(db, gid, user.username, 'gabung'))
+        stmts.push(
+          db`insert into rows(id, group_id, data) select f.id, ${gid}::text, f.data from finished_rows f where f.container = ${container} and f.id in (select jsonb_array_elements_text(${list}::jsonb)) on conflict (id) do nothing`,
+          db`delete from finished_rows f where f.container = ${container} and f.id in (select jsonb_array_elements_text(${list}::jsonb)) and exists (select 1 from rows r where r.id = f.id and r.group_id = ${gid})`,
+          db`delete from finished_groups g where g.container = ${container} and not exists (select 1 from finished_rows f where f.container = g.container)`,
+          logQ(db, 'barang', user.username, `Kembali dari Barang Jadi: Container ${container} · ${hit.length} baris`),
+        )
+        await db.transaction(stmts)
+        return send(res, 200, { ok: true, restored: hit.length, recreated: !live })
+      }
+      case 'finishedRows': { // isi satu container di Barang Jadi (untuk tabel lihat-saja)
+        const container = String(b.container || '')
+        const [fg] = await db`select container, buyer, packing_list_no, ship_date, status, revision, kind from finished_groups where container = ${container}`
+        if (!fg) return send(res, 404, { error: 'Container tidak ada di Barang Jadi.' })
+        const r = await db`select id, data, moved_at, moved_by from finished_rows where container = ${container} order by seq limit 5000`
+        return send(res, 200, { group: { container: fg.container, buyer: fg.buyer || '', packingListNo: fg.packing_list_no || '', shipDate: fg.ship_date || '', status: fg.status || '', revision: fg.revision || '', kind: fg.kind || '' }, rows: r.map((x) => ({ ...x.data, id: x.id, movedAt: x.moved_at, movedBy: x.moved_by })) })
+      }
       case 'clearLabels': { // hapus label old / new di satu container
         const gid = String(b.groupId || '')
         await db`update rows set data = data - 'label' where group_id = ${gid}`

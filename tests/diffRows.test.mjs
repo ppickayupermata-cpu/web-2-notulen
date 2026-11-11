@@ -44,3 +44,12 @@ test('ringkasan cadangan', () => {
   assert.deepEqual(r.so, [{ nama: '1', n: 2 }, { nama: '2', n: 1 }]); assert.deepEqual(r.perArea, [{ nama: 'PC', n: 2 }])
   assert.equal(r.old, 1); assert.equal(r.new, 1)
 })
+
+import { infoPindahSo, kunciSo } from '../src/utils/barangJadi.js'
+test('Barang Jadi: ringkasan per SO (semua baris SO, termasuk yang belum dipacking)', () => {
+  const rows = [{ id: 'a', groupId: 'G', so: '10', packed: 'x' }, { id: 'b', groupId: 'G', so: ' 10 ' }, { id: 'c', groupId: 'G', so: '20' }, { id: 'd', groupId: 'H', so: '10' }, { id: 'e', groupId: 'G', so: '' }]
+  const i = infoPindahSo(rows, 'G', '10')
+  assert.deepEqual(i.ids, ['a', 'b']); assert.equal(i.packed, 1); assert.equal(i.belum, 1); assert.equal(i.containerKosong, false)
+  assert.equal(infoPindahSo(rows, 'H', '10').containerKosong, true)       // satu-satunya SO di container H -> container akan kosong
+  assert.equal(kunciSo({ so: '' }), '(tanpa SO)'); assert.deepEqual(infoPindahSo(rows, 'G', '(tanpa SO)').ids, ['e'])
+})

@@ -4,7 +4,7 @@ import { api } from '../api.js'
 const Ctx = createContext()
 export const useData = () => useContext(Ctx)
 
-const EMPTY = { groups: [], rows: [], schedules: [], logs: [], backups: [], snapshots: [], settings: { autoDelete: true, months: 1 } }
+const EMPTY = { groups: [], rows: [], schedules: [], logs: [], backups: [], snapshots: [], finished: [], settings: { autoDelete: true, months: 1 } }
 
 // Data disimpan di database server, jadi PPIC, Warehouse, dan Read Only melihat data yang sama.
 // Data dimuat ulang tiap 15 detik dan setiap tab dibuka kembali.
@@ -94,6 +94,9 @@ export function DataProvider({ token, onUnauthorized, children }) {
   const restoreSnapshot = (id) => act('restoreSnapshot', { id })
   const restoreBackup = (id) => act('restoreBackup', { id })
   const moveRows = (p) => act('moveRows', p)
+  const finishRows = (groupId, ids) => act('finishRows', { groupId, ids })
+  const unfinishRows = (container, ids) => act('unfinishRows', { container, ids })
+  const finishedRows = (container) => ask('finishedRows', { container }, true)
   const backupInfo = (id) => ask('backupInfo', { id }), snapshotInfo = (id) => ask('snapshotInfo', { id })
   const clearLabels = (groupId) => act('clearLabels', { groupId })
   const dropBackup = (id) => act('dropBackup', { id })
@@ -111,7 +114,7 @@ export function DataProvider({ token, onUnauthorized, children }) {
   return (
     <Ctx.Provider value={{
       ...db, token, loading, error, clearError: () => setError(''), refresh, ask, saving, lastSaved, notice, clearNotice: () => setNotice(''),
-      applyChanges, updateGroup, addRows, mergeRows, moveRows, clearLabels, backupInfo, snapshotInfo, restoreBackup, dropBackup, cellHistory, snapshotNow, dropSnapshot, restoreSnapshot, addGroup, removeGroup, removeRows, addSchedules, removeSchedule, setSettings, removeLogs,
+      applyChanges, updateGroup, addRows, mergeRows, moveRows, finishRows, unfinishRows, finishedRows, clearLabels, backupInfo, snapshotInfo, restoreBackup, dropBackup, cellHistory, snapshotNow, dropSnapshot, restoreSnapshot, addGroup, removeGroup, removeRows, addSchedules, removeSchedule, setSettings, removeLogs,
     }}>
       {children}
     </Ctx.Provider>

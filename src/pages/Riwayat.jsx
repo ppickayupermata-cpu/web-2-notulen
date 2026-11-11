@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
 
-const TYPES = { upload: 'Upload', hapus: 'Hapus', jadwal: 'Jadwal', error: 'Error' }
+const TYPES = { upload: 'Upload', hapus: 'Hapus', barang: 'Barang Jadi', jadwal: 'Jadwal', error: 'Error' }
 
 export default function Riwayat() {
   const { logs, removeLogs } = useData()

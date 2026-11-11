@@ -43,6 +43,9 @@ export function ensureDb() {
           nama text not null, bagian text not null, k text not null, at timestamptz not null default now(), unique (room_id, k))`,
       db`alter table backups add column if not exists kind text not null default 'ganti'`,
       db`alter table groups add column if not exists kind text not null default ''`,
+      db`create table if not exists finished_groups (container text primary key, buyer text, packing_list_no text, ship_date text, status text, revision text, kind text not null default '', added_at text, updated_at timestamptz not null default now())`,
+      db`create table if not exists finished_rows (seq bigserial, id text primary key, container text not null references finished_groups(container) on delete cascade, so text not null default '', data jsonb not null, moved_at timestamptz not null default now(), moved_by text not null default '')`,
+      db`create index if not exists finished_rows_container_idx on finished_rows(container)`,
       db`alter table absen_log add column if not exists confirmed boolean not null default false`,
       db`alter table absen_log add column if not exists confirmed_at timestamptz`,
     ]).catch((e) => { ready = null; throw e })
@@ -105,7 +108,7 @@ export function verifyToken(req) {
 // ---------- baca semua data ----------
 export async function loadAll() {
   const db = getSql()
-  const [g, r, s, l, st, bk, sn] = await Promise.all([
+  const [g, r, s, l, st, bk, sn, fin] = await Promise.all([
     db`select id, container, buyer, packing_list_no, ship_date, status, revision, added_at, kind from groups order by seq`,
     db`select id, group_id, data from rows order by seq`,
     db`select id, kind, group_id, row_ids, label, run_on, created_by, created_at from schedules order by run_on`,
@@ -113,6 +116,8 @@ export async function loadAll() {
     db`select value from settings where key = 'main'`,
     db`select id, container, at, by, n, kind, payload->'group' as g from backups order by at desc limit 30`,
     db`select id, at, kind, by, n_groups, n_rows from snapshots order by at desc limit 20`,
+    db`select g.container, g.buyer, g.packing_list_no, g.ship_date, g.status, g.revision, g.kind, count(r.id)::int as n, count(distinct r.so)::int as so_n, max(r.moved_at) as moved_at
+       from finished_groups g left join finished_rows r on r.container = g.container group by g.container order by max(r.moved_at) desc nulls last`,
   ])
   return {
     groups: g.map((x) => ({ id: x.id, container: x.container, buyer: x.buyer, packingListNo: x.packing_list_no, shipDate: x.ship_date, status: x.status, revision: x.revision, addedAt: x.added_at, kind: x.kind || '' })),
@@ -122,6 +127,8 @@ export async function loadAll() {
     settings: { autoDelete: true, months: 1, ...(st[0]?.value || {}) },
     backups: bk.map((x) => ({ id: x.id, container: x.container, at: x.at, by: x.by, count: x.n, kind: x.kind, group: x.g || {} })),
     snapshots: sn.map((x) => ({ id: x.id, at: x.at, kind: x.kind, by: x.by, groups: x.n_groups, rows: x.n_rows })), // cadangan penuh database (isi tidak ikut dikirim)
+    // daftar Barang Jadi per container (isi baris diambil saat dibuka lewat aksi finishedRows)
+    finished: fin.map((x) => ({ container: x.container, buyer: x.buyer || '', packingListNo: x.packing_list_no || '', shipDate: x.ship_date || '', status: x.status || '', revision: x.revision || '', kind: x.kind || '', count: x.n, soCount: x.so_n, movedAt: x.moved_at })),
     // cadangan sebelum "Ganti semua" (isi tidak ikut dikirim)
   }
 }
@@ -197,7 +204,7 @@ export async function sweep() {
   }
   stmts.push(
     db`delete from cell_history where at < now() - interval '90 days'`,
-    db`delete from cell_history h where not exists (select 1 from rows r where r.id = h.row_id)`,
+    db`delete from cell_history h where not exists (select 1 from rows r where r.id = h.row_id) and not exists (select 1 from finished_rows f where f.id = h.row_id)`,
     db`delete from groups g where not exists (select 1 from rows r where r.group_id = g.id)`,
     db`delete from schedules s where s.kind = 'container' and not exists (select 1 from groups g where g.id = s.group_id)`,
     db`delete from schedules s where s.kind = 'so' and not exists

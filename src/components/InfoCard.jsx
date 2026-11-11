@@ -3,7 +3,7 @@ import { X } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { ringkas } from '../utils/ringkasBackup.js'
 
-const KIND = { ganti: 'Sebelum diganti upload baru', hapus: 'Sebelum dihapus', gabung: 'Sebelum digabung / dipindah', 'sebelum-pulih': 'Sebelum pemulihan', harian: 'Otomatis harian', manual: 'Manual' }
+const KIND = { ganti: 'Sebelum diganti upload baru', hapus: 'Sebelum dihapus', gabung: 'Sebelum digabung / dipindah', pindah: 'Sebelum dipindah ke Barang Jadi', 'sebelum-pulih': 'Sebelum pemulihan', harian: 'Otomatis harian', manual: 'Manual' }
 const tgl = (v) => (v ? new Date(v).toLocaleString('id-ID') : '-')
 const Baris = ({ k, v }) => <div className="ir"><span>{k}</span><b>{v === '' || v == null ? '-' : v}</b></div>
 

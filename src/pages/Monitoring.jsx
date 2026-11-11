@@ -6,9 +6,10 @@ import DataTable from '../components/DataTable.jsx'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { filterGroups, filterRows } from '../utils/filter.js'
-import { PencilLine, ArrowLeft, Radio, Trash2, QrCode, Share2, Merge, ArrowRightLeft, Tag, FileSpreadsheet, Boxes, ArchiveRestore } from 'lucide-react'
+import { PencilLine, ArrowLeft, Radio, Trash2, QrCode, Share2, Merge, ArrowRightLeft, Tag, FileSpreadsheet, Boxes, ArchiveRestore, PackageCheck } from 'lucide-react'
 import { colsFor, isCoAds } from '../config.js'
 import DataPulihan from './DataPulihan.jsx'
+import BarangJadi from './BarangJadi.jsx'
 import NotulenGabungan from '../components/NotulenGabungan.jsx'
 import PantauAbsensi from '../components/PantauAbsensi.jsx'
 import LiveDialog from '../components/LiveDialog.jsx'
@@ -20,7 +21,7 @@ const G0 = { container: '', buyer: '' }
 const I0 = { so: '', soItem: '', productCode: '' }
 
 export default function Monitoring({ by }) {
-  const { rows, groups, backups, removeGroup, updateGroup, applyChanges, refresh, clearLabels } = useData()
+  const { rows, groups, backups, finished, removeGroup, updateGroup, applyChanges, refresh, clearLabels } = useData()
   const [tab, setTabState] = useState(() => { try { return sessionStorage.getItem('pl_mon_tab') || 'all' } catch { return 'all' } }) // coads | all | pulih
   const setTab = (t) => { setTabState(t); setMsg(''); try { sessionStorage.setItem('pl_mon_tab', t) } catch { /* mode privat */ } }
   const [pa, setPa] = useState(null), [ld, setLd] = useState(null), [ng, setNg] = useState(false) // grup untuk panel Pantau absensi / dialog link live
@@ -85,8 +86,10 @@ export default function Monitoring({ by }) {
       <button role="tab" aria-selected={tab === 'coads'} className={tab === 'coads' ? 'on' : ''} onClick={() => setTab('coads')}><FileSpreadsheet size={15} /> Packlist CO ADS <i>{nCo}</i></button>
       <button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}><Boxes size={15} /> All Container <i>{groups.length}</i></button>
       <button role="tab" aria-selected={tab === 'pulih'} className={tab === 'pulih' ? 'on' : ''} onClick={() => setTab('pulih')}><ArchiveRestore size={15} /> Terpulihkan <i>{backups?.length || 0}</i></button>
+      <button role="tab" aria-selected={tab === 'barang'} className={tab === 'barang' ? 'on' : ''} onClick={() => setTab('barang')}><PackageCheck size={15} /> Barang Jadi <i>{finished?.length || 0}</i></button>
     </div>
   )
+  if (tab === 'barang') return <><div className="toolbar"><h2 style={{ margin: 0 }}>Monitoring</h2></div>{tabs}<BarangJadi /></>
   if (tab === 'pulih') return <><div className="toolbar"><h2 style={{ margin: 0 }}>Monitoring</h2></div>{tabs}<DataPulihan embedded /></>
   return (
     <>

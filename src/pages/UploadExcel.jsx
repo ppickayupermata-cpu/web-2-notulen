@@ -8,7 +8,7 @@ import { INFO_COLS } from '../config.js'
 import UploadCoAds from './UploadCoAds.jsx'
 
 const TAG = { baru: 'Baru', sama: 'Sudah ada', berubah: 'Berubah' }
-const KIND = { ganti: 'sebelum diganti', hapus: 'sebelum dihapus', gabung: 'sebelum digabung', 'sebelum-pulih': 'sebelum pemulihan' }
+const KIND = { ganti: 'sebelum diganti', hapus: 'sebelum dihapus', gabung: 'sebelum digabung', pindah: 'sebelum dipindah ke Barang Jadi', 'sebelum-pulih': 'sebelum pemulihan' }
 const LBL = Object.fromEntries(INFO_COLS.map((c) => [c.key, c.label]))
 
 function UploadBiasa({ by }) {

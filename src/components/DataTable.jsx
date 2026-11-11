@@ -12,7 +12,7 @@ const isN = (x) => x !== '' && x != null && Number.isFinite(Number(x))
 const show = (c, v) => (c.type === 'date' && v && !String(v).startsWith('#') ? String(v).split('-').reverse().join('/') : v)
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch { return d } }
 
-export default function DataTable({ rows, cols: baseCols, editable = [], editing = false, getValue, onChange, selectable = false, selected = [], onToggle, onToggleAll, fileName, manage = false, groupId, onNotulen, onPack, compactTools = false, onChangeMany, leadExtras = null, onCursor }) {
+export default function DataTable({ rows, cols: baseCols, editable = [], editing = false, getValue, onChange, selectable = false, selected = [], onToggle, onToggleAll, fileName, manage = false, groupId, onNotulen, onPack, compactTools = false, onChangeMany, leadExtras = null, onCursor, soActions = [] }) {
   const { settings, setSettings, addRows, removeRows, rows: allRows, cellHistory, applyChanges } = useData()
   const { confirm, dialog } = useConfirm()
   const extra = (settings.cols || []).map((c) => ({ ...c, type: 'text' }))
@@ -340,7 +340,7 @@ export default function DataTable({ rows, cols: baseCols, editable = [], editing
         {segs.map((sg, si) => (
           <div key={sg.so} className="sobox" style={{ containIntrinsicSize: 'auto ' + (80 + (sg.end - sg.start) * 38) + 'px' }}>
             <div className="sotitle">SO {sg.so}<small> · {sg.end - sg.start} baris</small>
-              <span className="sotools"><button className="btn sm" title="Sesuaikan lebar kolom dengan isinya (klik dua kali tepi header untuk satu kolom)" onClick={() => fit(sg.so)}><MoveHorizontal size={14} /> Auto-fit</button><button className="btn sm" title="Pakai ukuran kolom tabel ini untuk semua tabel" onClick={() => samakan(sg.so)}>Samakan ke semua</button><button className="btn sm" title="Kembalikan ukuran tabel ini ke bawaan" disabled={!wd.so?.[sg.so]} onClick={() => resetT(sg.so)}>Reset ukuran</button></span></div>
+              <span className="sotools"><button className="btn sm" title="Sesuaikan lebar kolom dengan isinya (klik dua kali tepi header untuk satu kolom)" onClick={() => fit(sg.so)}><MoveHorizontal size={14} /> Auto-fit</button><button className="btn sm" title="Pakai ukuran kolom tabel ini untuk semua tabel" onClick={() => samakan(sg.so)}>Samakan ke semua</button><button className="btn sm" title="Kembalikan ukuran tabel ini ke bawaan" disabled={!wd.so?.[sg.so]} onClick={() => resetT(sg.so)}>Reset ukuran</button>{soActions.map((a) => <button key={a.key} className={'btn sm ' + (a.cls || '')} title={a.title} disabled={a.disabled} onClick={() => a.onClick(sg.so)}>{a.icon}{a.label}</button>)}</span></div>
             <table className={'grid fx' + (editing ? ' ex' : '')} style={{ width: tableW(sg.so) }}>
               <colgroup>{onPack && <col style={{ width: LP }} />}<col style={{ width: 56 }} />{selectable && <col style={{ width: 34 }} />}{cols.map((c) => <col key={c.key} style={{ width: W(c.key, sg.so) }} />)}{onPack && <col style={{ width: RP }} />}</colgroup>
               <thead>

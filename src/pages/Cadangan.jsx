@@ -6,7 +6,7 @@ import { useData } from '../context/DataContext.jsx'
 import { bangunExcelSemua, unduhBlob, stamp } from '../utils/exportAll.js'
 
 const KIND = { harian: 'Otomatis harian', manual: 'Manual', 'sebelum-pulih': 'Sebelum pemulihan' }
-const KIND_B = { ganti: 'Sebelum diganti', hapus: 'Sebelum dihapus', gabung: 'Sebelum digabung', 'sebelum-pulih': 'Sebelum pemulihan' }
+const KIND_B = { ganti: 'Sebelum diganti', hapus: 'Sebelum dihapus', gabung: 'Sebelum digabung', pindah: 'Sebelum dipindah ke Barang Jadi', 'sebelum-pulih': 'Sebelum pemulihan' }
 const XLSX_T = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 export default function Cadangan() {

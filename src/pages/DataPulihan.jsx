@@ -8,7 +8,7 @@ import InfoCard from '../components/InfoCard.jsx'
 import { filterGroups } from '../utils/filter.js'
 import { colsFor } from '../config.js'
 
-const KIND = { ganti: 'Sebelum diganti', hapus: 'Sebelum dihapus', gabung: 'Sebelum digabung', 'sebelum-pulih': 'Sebelum pemulihan' }
+const KIND = { ganti: 'Sebelum diganti', hapus: 'Sebelum dihapus', gabung: 'Sebelum digabung', pindah: 'Sebelum dipindah ke Barang Jadi', 'sebelum-pulih': 'Sebelum pemulihan' }
 const G0 = { container: '', buyer: '' }
 
 // Halaman Data Pulihan: daftar file (cadangan container) yang bisa dipulihkan, tampilannya sama seperti Monitoring.

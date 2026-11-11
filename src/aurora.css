@@ -113,3 +113,6 @@ h2{font-weight:700;letter-spacing:-.01em}
 @media (max-width:700px){:root .content{padding:.75rem 1rem}:root .login::before,:root .login::after{display:none}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media (prefers-reduced-transparency:reduce){:root .shellbar,:root .login .panel,:root .overlay{-webkit-backdrop-filter:none;backdrop-filter:none}}
+
+/* header SO memuat banyak tombol (Auto-fit, Samakan, Reset ukuran, Barang Jadi): boleh turun baris, tidak bocor */
+:root .sotitle,:root .sotools{flex-wrap:wrap}
