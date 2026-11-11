@@ -5,7 +5,7 @@ export const useUi = () => useContext(Ui)
 
 // Tema (terang/gelap) + mode layar penuh. Di layar penuh, kolom pencarian disembunyikan dan hanya muncul lewat toggle.
 export function UiProvider({ children }) {
-  const [theme, setTheme] = useState(() => localStorage.getItem('pl_theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'))
+  const [theme, setTheme] = useState(() => localStorage.getItem('pl_theme') || 'light')
   const [fs, setFs] = useState(false)
   const [showFilter, setShowFilter] = useState(false)
   const [jump, setJump] = useState(null) // { groupId, so }: lompat dari pencarian global ke tabel Monitoring

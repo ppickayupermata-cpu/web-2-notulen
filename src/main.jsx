@@ -6,6 +6,7 @@ import LiveView from './pages/LiveView.jsx'
 import Watermark from './components/Watermark.jsx'
 import { UiProvider } from './context/UiContext.jsx'
 import './styles.css'
+import './aurora.css'
 // Link QR absensi (?absen=ID) membuka halaman absen publik tanpa login
 // Link live read-only (?live=TOKEN) juga publik: hanya melihat, tanpa login
 const q = new URLSearchParams(location.search), absen = q.get('absen'), live = q.get('live')

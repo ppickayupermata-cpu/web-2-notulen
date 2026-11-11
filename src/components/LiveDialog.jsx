@@ -20,7 +20,7 @@ export default function LiveDialog({ group, onClose }) {
         {l && <>
           <BagikanLink url={url} judul={'Live · ' + group.container} sub={group.buyer ? 'Buyer ' + group.buyer : ''} />
           <div className="toolbar wrap" style={{ marginTop: 8 }}>
-            <label className="sw"><input type="checkbox" checked={l.enabled} onChange={(e) => ubah({ enabled: e.target.checked })} /> Link aktif</label><span className="spacer" />
+            <label className="swlabel"><input type="checkbox" checked={l.enabled} onChange={(e) => ubah({ enabled: e.target.checked })} /> Link aktif</label><span className="spacer" />
             <a className="btn sm" href={url} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Buka tampilan live</a>
             <button className="btn sm danger" onClick={() => window.confirm('Ganti link? Link lama langsung tidak bisa dipakai lagi dan perlu dibagikan ulang.') && ubah({ rotate: true })}><RefreshCw size={14} /> Ganti link</button>
           </div>
