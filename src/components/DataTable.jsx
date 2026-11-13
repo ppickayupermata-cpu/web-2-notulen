@@ -75,7 +75,8 @@ export default function DataTable({ rows, cols: baseCols, editable = [], editing
   const segs = []; for (const [so, g] of bySo) { const st = segs.length ? segs.at(-1).end : 0; segs.push({ so, start: st, end: st + g.length }) }
   if (!rows.length) return <div className="empty">Tidak ada data yang cocok.</div>
 
-  const rg = sel && { r0: Math.min(sel.a[0], sel.b[0]), r1: Math.max(sel.a[0], sel.b[0]), c0: Math.min(sel.a[1], sel.b[1]), c1: Math.max(sel.a[1], sel.b[1]) }
+  const selOk = !!sel && sel.a[0] < vis.length && sel.b[0] < vis.length   // seleksi yang sudah di luar baris (filter berubah / baris dihapus) dianggap tidak ada
+  const rg = selOk && { r0: Math.min(sel.a[0], sel.b[0]), r1: Math.max(sel.a[0], sel.b[0]), c0: Math.min(sel.a[1], sel.b[1]), c1: Math.max(sel.a[1], sel.b[1]) }
   const inR = (i, c) => rg && i >= rg.r0 && i <= rg.r1 && c >= rg.c0 && c <= rg.c1
   // perubahan banyak sel sekaligus (paste, isi bawah, hapus, ganti semua) = SATU langkah Undo di halaman Input
   const many = (list) => { if (!list.length) return; onChangeMany ? onChangeMany(list) : list.forEach((x) => onChange(x.id, x.key, x.v)) }
@@ -175,7 +176,7 @@ export default function DataTable({ rows, cols: baseCols, editable = [], editing
   const okEdit = (r, c) => !!(editing && r && c && edt.includes(c.key))
   const reveal = (i, ci) => requestAnimationFrame(() => wrapRef.current?.querySelector(`[data-rc="${i},${ci}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }))
   const clampI = (i) => Math.max(0, Math.min(vis.length - 1, i)), clampC = (c) => Math.max(0, Math.min(cols.length - 1, c))
-  const go = (i, ci) => { const ni = clampI(i), nc = clampC(ci); setSel({ a: [ni, nc], b: [ni, nc] }); reveal(ni, nc) }
+  const go = (i, ci) => { if (!vis.length) return; const ni = clampI(i), nc = clampC(ci); setSel({ a: [ni, nc], b: [ni, nc] }); reveal(ni, nc) }
   const done = () => { setEd(null); wrapRef.current?.focus({ preventScroll: true }) }
   const startEdit = (i, ci) => { const r = vis[i], c = cols[ci]; if (okEdit(r, c)) setEd({ id: r.id, key: c.key, orig: val(r, c.key) ?? '' }) }
   const editKey = (e, i, ci, r, c, multi) => {
@@ -209,6 +210,7 @@ export default function DataTable({ rows, cols: baseCols, editable = [], editing
     setPasteMsg(`${ch.length} sel ditempel` + (bad ? ` · ${bad} tanggal tidak bisa dibaca (dilewati)` : '') + (skip ? ` · ${skip} sel di kolom yang tidak bisa diisi dilewati` : '')); setTimeout(() => setPasteMsg(''), 6000)
   }
   const onKey = (e) => {
+    if (!vis.length) return
     if (hot(e)) return
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo() }

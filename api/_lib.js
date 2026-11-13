@@ -3,6 +3,8 @@ import { neon } from '@neondatabase/serverless'
 import { createHmac, timingSafeEqual, randomUUID } from 'node:crypto'
 export { randomUUID }
 export { tanggalPulih } from './_pulih.js'
+import { containerDari } from './_teks.js'
+export { containerDari }
 export class PublicError extends Error {}
 
 // ---------- database ----------
@@ -41,6 +43,12 @@ export function ensureDb() {
           title text default '', created_by text, created_at timestamptz not null default now(), closed boolean not null default false)`,
       db`create table if not exists absen_log (seq bigserial, id text primary key, room_id text not null references absen_rooms(id) on delete cascade,
           nama text not null, bagian text not null, k text not null, at timestamptz not null default now(), unique (room_id, k))`,
+      db`create table if not exists meetings (id text primary key, nama text not null default '', status text not null default 'berjalan', room_id text references absen_rooms(id) on delete set null, started_at timestamptz not null default now(), ended_at timestamptz, started_by text not null default '', auto_confirm boolean not null default false)`,
+      db`create table if not exists live_global (id text primary key, token text not null unique, enabled boolean not null default true, last_group_id text, last_at timestamptz, created_at timestamptz not null default now())`,
+      db`alter table logs add column if not exists container text`,
+      db`update logs set container = coalesce((regexp_match(detail, 'Container (.+?)(?: · | → |: |, | [(]|$)'))[1], '') where container is null`,
+      db`delete from backups where kind = 'pindah'`,
+      db`delete from backups b where exists (select 1 from logs l where l.type = 'barang' and l.container = b.container and abs(extract(epoch from (l.at - b.at))) < 5)`,
       db`alter table backups add column if not exists kind text not null default 'ganti'`,
       db`alter table groups add column if not exists kind text not null default ''`,
       db`create table if not exists finished_groups (container text primary key, buyer text, packing_list_no text, ship_date text, status text, revision text, kind text not null default '', added_at text, updated_at timestamptz not null default now())`,
@@ -68,8 +76,8 @@ export async function backupStmts(db, gid, by, kind) {
 }
 export const clip = (v, n = 200) => String(v ?? '').slice(0, n)
 export const todayTZ = () => new Date().toLocaleDateString('sv-SE', { timeZone: process.env.APP_TZ || 'Asia/Jakarta' })
-export const logQ = (db, type, by, detail) =>
-  db`insert into logs(id, type, actor, detail) values (${randomUUID()}, ${type}, ${by}, ${clip(detail, 500)})`
+export const logQ = (db, type, by, detail, container) =>
+  db`insert into logs(id, type, actor, detail, container) values (${randomUUID()}, ${type}, ${by}, ${clip(detail, 500)}, ${container ?? containerDari(detail)})`
 
 // ---------- http ----------
 export const send = (res, code, obj) => { res.statusCode = code; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(obj)) }
@@ -112,9 +120,9 @@ export async function loadAll() {
     db`select id, container, buyer, packing_list_no, ship_date, status, revision, added_at, kind from groups order by seq`,
     db`select id, group_id, data from rows order by seq`,
     db`select id, kind, group_id, row_ids, label, run_on, created_by, created_at from schedules order by run_on`,
-    db`select id, at, type, actor, detail from logs order by at desc limit 500`,
+    db`select id, at, type, actor, detail, container from logs order by at desc limit 500`,
     db`select value from settings where key = 'main'`,
-    db`select id, container, at, by, n, kind, payload->'group' as g from backups order by at desc limit 30`,
+    db`select id, container, at, by, n, kind, payload->'group' as g from backups b where kind <> 'pindah' and not exists (select 1 from logs l where l.type = 'barang' and l.container = b.container and abs(extract(epoch from (l.at - b.at))) < 5) order by at desc limit 30`,
     db`select id, at, kind, by, n_groups, n_rows from snapshots order by at desc limit 20`,
     db`select g.container, g.buyer, g.packing_list_no, g.ship_date, g.status, g.revision, g.kind, count(r.id)::int as n, count(distinct r.so)::int as so_n, max(r.moved_at) as moved_at
        from finished_groups g left join finished_rows r on r.container = g.container group by g.container order by max(r.moved_at) desc nulls last`,
@@ -123,7 +131,7 @@ export async function loadAll() {
     groups: g.map((x) => ({ id: x.id, container: x.container, buyer: x.buyer, packingListNo: x.packing_list_no, shipDate: x.ship_date, status: x.status, revision: x.revision, addedAt: x.added_at, kind: x.kind || '' })),
     rows: r.map((x) => ({ ...x.data, id: x.id, groupId: x.group_id })),
     schedules: s.map((x) => ({ id: x.id, kind: x.kind, groupId: x.group_id, rowIds: x.row_ids || [], label: x.label, date: x.run_on, by: x.created_by, createdAt: x.created_at })),
-    logs: l.map((x) => ({ id: x.id, at: x.at, type: x.type, by: x.actor, detail: x.detail })),
+    logs: l.map((x) => ({ id: x.id, at: x.at, type: x.type, by: x.actor, detail: x.detail, container: x.container || '' })),
     settings: { autoDelete: true, months: 1, ...(st[0]?.value || {}) },
     backups: bk.map((x) => ({ id: x.id, container: x.container, at: x.at, by: x.by, count: x.n, kind: x.kind, group: x.g || {} })),
     snapshots: sn.map((x) => ({ id: x.id, at: x.at, kind: x.kind, by: x.by, groups: x.n_groups, rows: x.n_rows })), // cadangan penuh database (isi tidak ikut dikirim)
@@ -133,6 +141,15 @@ export async function loadAll() {
   }
 }
 
+// satu link live untuk MEETING: menampilkan container yang sedang dibuka host (berpindah otomatis); dibuat bila belum ada
+export async function pastikanLiveGlobal(db) {
+  const [l] = await db`select token, enabled from live_global where id = 'main'`
+  if (l) return l
+  const token = randomUUID().replace(/-/g, '').slice(0, 20)
+  await db`insert into live_global(id, token) values ('main', ${token}) on conflict (id) do nothing`
+  const [n] = await db`select token, enabled from live_global where id = 'main'`
+  return n
+}
 // token live read-only untuk satu container; dibuat bila belum ada (dipakai saat admin mengkonfirmasi absen)
 export async function pastikanLive(db, groupId) {
   const [l] = await db`select token, enabled from live_links where group_id = ${groupId}`

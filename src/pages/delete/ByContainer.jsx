@@ -53,7 +53,7 @@ export default function ByContainer({ by }) {
 
   return (
     <>
-      <FilterBar fields={GROUP_FIELDS} value={f} onChange={(v) => { setF(v); setMsg(null) }} onClear={() => setF(G0)} />
+      <FilterBar fields={GROUP_FIELDS} scope="Container, Buyer, Packing List" value={f} onChange={(v) => { setF(v); setMsg(null) }} onClear={() => setF(G0)} />
       <div className="toolbar wrap">
         <button className="btn danger" disabled={!picked.length} onClick={removeNow}>Hapus sekarang ({picked.length})</button>
         <span className="sep" />

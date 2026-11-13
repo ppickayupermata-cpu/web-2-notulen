@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useFill } from '../utils/useFill.js'
 import ByContainer from './delete/ByContainer.jsx'
 import ByRows from './delete/ByRows.jsx'
 import Schedules from './delete/Schedules.jsx'
@@ -10,6 +11,7 @@ const TABS = [
 ]
 
 export default function DeleteData({ by }) {
+  useFill()
   const [tab, setTab] = useState('container')
   return (
     <>

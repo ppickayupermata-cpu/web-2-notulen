@@ -10,6 +10,7 @@ import { PencilLine, ArrowLeft, Radio, Trash2, QrCode, Share2, Merge, ArrowRight
 import { colsFor, isCoAds } from '../config.js'
 import DataPulihan from './DataPulihan.jsx'
 import BarangJadi from './BarangJadi.jsx'
+import { useFill } from '../utils/useFill.js'
 import NotulenGabungan from '../components/NotulenGabungan.jsx'
 import PantauAbsensi from '../components/PantauAbsensi.jsx'
 import LiveDialog from '../components/LiveDialog.jsx'
@@ -22,9 +23,10 @@ const I0 = { so: '', soItem: '', productCode: '' }
 
 export default function Monitoring({ by }) {
   const { rows, groups, backups, finished, removeGroup, updateGroup, applyChanges, refresh, clearLabels } = useData()
+  useFill()   // hanya tabel yang punya scroll
   const [tab, setTabState] = useState(() => { try { return sessionStorage.getItem('pl_mon_tab') || 'all' } catch { return 'all' } }) // coads | all | pulih
   const setTab = (t) => { setTabState(t); setMsg(''); try { sessionStorage.setItem('pl_mon_tab', t) } catch { /* mode privat */ } }
-  const [pa, setPa] = useState(null), [ld, setLd] = useState(null), [ng, setNg] = useState(false) // grup untuk panel Pantau absensi / dialog link live
+  const [pa, setPa] = useState(false), [ld, setLd] = useState(null), [ng, setNg] = useState(false) // grup untuk panel Pantau absensi / dialog link live
   const { confirm, dialog } = useConfirm()
   const [f, setF] = useState(G0)
   const [fi, setFi] = useState(I0)
@@ -68,7 +70,7 @@ export default function Monitoring({ by }) {
           <span className="live-badge"><Radio size={14} /> LIVE</span><span className="spacer" />
           <button className="btn" onClick={() => setLd(open)}><Share2 size={15} /> Bagikan link live</button>
         </div>
-        <FilterBar fields={isCoAds(open) ? ITEM_FIELDS_COADS : ITEM_FIELDS} value={fi} onChange={setFi} onClear={() => setFi(I0)} />
+        <FilterBar fields={isCoAds(open) ? ITEM_FIELDS_COADS : ITEM_FIELDS} scope="isi container ini: SO, PO, produk, AREA, keterangan" value={fi} onChange={setFi} onClear={() => setFi(I0)} />
         <div className="count">{shown.length} baris</div>
         <DataTable fileName={`Container-${open.container}`} cols={colsFor(open)} rows={shown} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={(r) => applyChanges({ [r.id]: { packed: r.packed ? '' : '1', ...(r.packed ? (String(r.area || '').trim().toUpperCase() === 'PACKING' ? { area: '' } : {}) : { area: 'PACKING' }) } })} />
         {nt && <Notulen calc={calcRef.current} group={open} rows={rows.filter((r) => r.groupId === open.id)} onClose={() => setNt(false)} />}
@@ -93,9 +95,10 @@ export default function Monitoring({ by }) {
   if (tab === 'pulih') return <><div className="toolbar"><h2 style={{ margin: 0 }}>Monitoring</h2></div>{tabs}<DataPulihan embedded /></>
   return (
     <>
-      <div className="toolbar"><h2 style={{ margin: 0 }}>Monitoring</h2><span className="spacer" /><button className="btn" disabled={!groups.length} onClick={() => setNg(true)} title="Gabungkan notulen beberapa container menjadi satu (semua atau custom select)"><Merge size={15} /> Gabungkan notulen</button></div>
+      <div className="toolbar"><h2 style={{ margin: 0 }}>Monitoring</h2><span className="spacer" /><button className="btn" onClick={() => setPa(true)} title="Absensi satu kali untuk semua container, Meeting dimulai / ditutup, dan link live meeting"><QrCode size={15} /> Absensi &amp; Meeting</button>
+      <button className="btn" disabled={!groups.length} onClick={() => setNg(true)} title="Gabungkan notulen beberapa container menjadi satu (semua atau custom select)"><Merge size={15} /> Gabungkan notulen</button></div>
       {tabs}
-      <FilterBar fields={GROUP_FIELDS} value={f} onChange={(v) => { setF(v); setMsg('') }} onClear={() => setF(G0)} />
+      <FilterBar fields={GROUP_FIELDS} scope="Container, Buyer, Packing List" value={f} onChange={(v) => { setF(v); setMsg('') }} onClear={() => setF(G0)} />
       <div className="count">{shown.length} packing list{tab === 'coads' ? ' CO ADS' : ''} {msg && <span className="msg ok"> · {msg}</span>}</div>
       <GroupList
         groups={shown} rows={rows} canEdit={canDelete} onSave={updateGroup}
@@ -104,7 +107,6 @@ export default function Monitoring({ by }) {
           <>
             <button className="btn sm primary" onClick={() => setInputId(g.id)}><PencilLine size={14} /> Input</button>
             <button className="btn sm" onClick={() => setOpenId(g.id)} title="Tampilan live (hanya lihat, ter-update otomatis)"><Radio size={14} /> Live</button>
-            <button className="btn sm" onClick={() => setPa(g)} title="Pantau & konfirmasi absensi, bagikan QR"><QrCode size={14} /> Pantau absensi</button>
             {groups.length > 1 && <button className="btn sm" onClick={() => setMoveId(g.id)} title="Masukkan data lama dari container ini ke container baru (pilih baris)"><ArrowRightLeft size={14} /> Pindah data</button>}
             {rows.some((r) => r.groupId === g.id && r.label) && <button className="btn sm" onClick={() => clearLabels(g.id)} title="Hapus label OLD / NEW di container ini"><Tag size={14} /> Hapus label</button>}
             {canDelete && <button className="btn sm danger" onClick={() => del(g)}><Trash2 size={14} /> Delete</button>}
@@ -112,7 +114,7 @@ export default function Monitoring({ by }) {
         )}
       />
       {ng && <NotulenGabungan groups={groups} rows={rows} onClose={() => setNg(false)} />}
-      {pa && <PantauAbsensi group={pa} onClose={() => setPa(null)} />}
+      {pa && <PantauAbsensi onClose={() => setPa(false)} />}
       {dialog}
     </>
   )

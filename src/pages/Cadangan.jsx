@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { FileSpreadsheet, FileJson, Archive, RotateCcw, Trash2, ShieldCheck, Info } from 'lucide-react'
 import InfoCard from '../components/InfoCard.jsx'
+import FilterBar, { GROUP_FIELDS } from '../components/FilterBar.jsx'
+import { filterGroups } from '../utils/filter.js'
+import { useFill } from '../utils/useFill.js'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { bangunExcelSemua, unduhBlob, stamp } from '../utils/exportAll.js'
@@ -12,6 +15,9 @@ const XLSX_T = 'application/vnd.openxmlformats-officedocument.spreadsheetml.shee
 export default function Cadangan() {
   const { groups, rows, schedules, settings, snapshots, snapshotNow, dropSnapshot, restoreSnapshot, backups, restoreBackup, dropBackup } = useData()
   const { confirm, dialog } = useConfirm()
+  useFill()   // hanya tabel yang punya scroll
+  const ambil = (k) => { try { const v = sessionStorage.getItem(k) || ''; sessionStorage.removeItem(k); return v } catch { return '' } }
+  const [tab, setTab] = useState(() => ambil('pl_cad_tab') || 'container'), [f, setF] = useState(() => ({ container: '', buyer: '', q: ambil('pl_q') }))
   const [busy, setBusy] = useState(''), [msg, setMsg] = useState(null), [info, setInfo] = useState(null) // { type, id }
   const jalan = async (kode, fn, ok) => { setBusy(kode); setMsg(null); try { const r = await fn(); setMsg(r === false ? { type: 'err', text: 'Gagal. Coba lagi.' } : { type: 'ok', text: ok }) } catch (e) { setMsg({ type: 'err', text: 'Gagal: ' + (e.message || e) }) } setBusy('') }
 
@@ -29,24 +35,58 @@ export default function Cadangan() {
   }
   const buang = async (s) => { if (await confirm({ title: 'Buang cadangan ini?', message: `Cadangan ${new Date(s.at).toLocaleString('id-ID')} dihapus permanen.`, confirmLabel: 'Buang', danger: true })) jalan('d' + s.id, () => dropSnapshot(s.id), 'Cadangan dibuang.') }
 
+  // cadangan dipisah per container: satu kelompok per container, terbaru di atas, agar mudah memilih mana yang dipulihkan
+  const kelompok = useMemo(() => {
+    const m = new Map()
+    ;(backups || []).forEach((b) => { if (!m.has(b.container)) m.set(b.container, []); m.get(b.container).push(b) })
+    return [...m].map(([container, list]) => ({ container, list, buyer: list[0]?.group?.buyer || '', packingListNo: list[0]?.group?.packingListNo || '', last: list[0]?.at }))
+      .sort((a, b) => new Date(b.last) - new Date(a.last))
+  }, [backups])
+  const tampil = filterGroups(kelompok, f)
+  const nRows = (c) => { const g = groups.find((x) => x.container === c); return g ? rows.filter((r) => r.groupId === g.id).length : null }
+
   return (
     <>
       <h2>Cadangan Data</h2>
-      {msg && <div className={'msg ' + msg.type}>{msg.text}</div>}
-      <div className="panel wide">
-        <h3 style={{ marginTop: 0 }}>Unduh semua data</h3>
-        <p className="hint">{groups.length} container · {rows.length} baris saat ini. Unduh berkala dan simpan di tempat lain (Google Drive, flashdisk) agar data tidak hanya bergantung pada satu database.</p>
-        <div className="toolbar wrap">
-          <button className="btn primary" disabled={!groups.length || !!busy} onClick={unduhExcel}><FileSpreadsheet size={15} /> {busy === 'xlsx' ? 'Menyusun…' : 'Unduh Excel (semua container)'}</button>
-          <button className="btn" disabled={!groups.length || !!busy} onClick={unduhJson}><FileJson size={15} /> Unduh cadangan (.json)</button>
-        </div>
+      <div className="montabs" role="tablist" aria-label="Jenis cadangan">
+        <button role="tab" aria-selected={tab === 'container'} className={tab === 'container' ? 'on' : ''} onClick={() => setTab('container')}><RotateCcw size={15} /> Per container <i>{kelompok.length}</i></button>
+        <button role="tab" aria-selected={tab === 'penuh'} className={tab === 'penuh' ? 'on' : ''} onClick={() => setTab('penuh')}><ShieldCheck size={15} /> Cadangan penuh <i>{snapshots?.length || 0}</i></button>
+        <button role="tab" aria-selected={tab === 'unduh'} className={tab === 'unduh' ? 'on' : ''} onClick={() => setTab('unduh')}><FileSpreadsheet size={15} /> Unduh semua data</button>
       </div>
-      <div className="panel wide">
-        <h3 style={{ marginTop: 0 }}><ShieldCheck size={17} style={{ verticalAlign: '-3px' }} /> Cadangan otomatis di server</h3>
-        <p className="hint">Dibuat otomatis tiap hari (sebelum pembersihan data lama) dan sebelum pemulihan. 14 terakhir disimpan di database yang sama dengan data aplikasi.</p>
+      {msg && <div className={'msg ' + msg.type}>{msg.text}</div>}
+
+      {tab === 'container' && <>
+        <p className="hint">Dibuat otomatis sebelum satu container diganti, dihapus, atau digabung (8 terakhir per container). Memulihkan tidak membuang cadangan, dan isi container yang sedang tampil dicadangkan dulu.</p>
+        <FilterBar fields={GROUP_FIELDS} scope="Container, Buyer, Packing List" value={f} onChange={setF} onClear={() => setF({ container: '', buyer: '', q: '' })} />
+        {!tampil.length ? <div className="empty">{kelompok.length ? 'Tidak ada container yang cocok.' : 'Belum ada cadangan container.'}</div> : (
+          <div className="tablewrap">
+            <table className="grid">
+              <thead><tr><th>Waktu</th><th>Jenis</th><th>Baris</th><th>Oleh</th><th>Aksi</th></tr></thead>
+              <tbody>{tampil.map((k) => { const n = nRows(k.container); return [
+                <tr key={'g' + k.container} className="grp"><td colSpan="5">
+                  <b>Container {k.container}</b> · {k.list.length} cadangan · {n == null ? 'tidak ada di Monitoring' : `ada di Monitoring (${n} baris)`}
+                  <button className="btn sm" style={{ marginLeft: 12 }} disabled={!!busy} onClick={() => pulihC(k.list[0])}><RotateCcw size={14} /> Pulihkan yang terbaru</button>
+                </td></tr>,
+                ...k.list.map((b) => (
+                  <tr key={b.id}>
+                    <td>{new Date(b.at).toLocaleString('id-ID')}</td><td>{KIND_B[b.kind] || 'Cadangan'}</td><td>{b.count}</td><td>{b.by || 'Sistem'}</td>
+                    <td className="actions">
+                      <button className="btn sm" onClick={() => setInfo({ type: 'backup', id: b.id })}><Info size={14} /> Lihat info</button>
+                      <button className="btn sm" disabled={!!busy} onClick={() => pulihC(b)}><RotateCcw size={14} /> Pulihkan</button>
+                      <button className="btn sm danger" disabled={!!busy} onClick={() => dropBackup(b.id)}><Trash2 size={14} /> Buang</button>
+                    </td>
+                  </tr>)),
+              ] })}</tbody>
+            </table>
+          </div>
+        )}
+      </>}
+
+      {tab === 'penuh' && <>
+        <p className="hint">Cadangan SEMUA container sekaligus. Dibuat otomatis tiap hari (sebelum pembersihan data lama) dan sebelum pemulihan; 14 terakhir disimpan. Untuk memulihkan satu container saja, pakai tab Per container.</p>
         <div className="toolbar wrap"><button className="btn" disabled={!!busy} onClick={buat}><Archive size={15} /> Buat cadangan sekarang</button></div>
         {!snapshots?.length ? <div className="empty">Belum ada cadangan. Cadangan pertama dibuat otomatis saat pembersihan harian berjalan, atau klik tombol di atas.</div> : (
-          <div className="tablewrap" style={{ maxHeight: 'none' }}>
+          <div className="tablewrap">
             <table className="grid">
               <thead><tr><th>Waktu</th><th>Jenis</th><th>Container</th><th>Baris</th><th>Oleh</th><th>Aksi</th></tr></thead>
               <tbody>{snapshots.map((s) => (
@@ -61,27 +101,18 @@ export default function Cadangan() {
             </table>
           </div>
         )}
-      </div>
-      <div className="panel wide">
-        <h3 style={{ marginTop: 0 }}><RotateCcw size={17} style={{ verticalAlign: '-3px' }} /> Cadangan per container</h3>
-        <p className="hint">Dibuat otomatis sebelum satu container diganti, dihapus, atau digabung (8 terakhir per container). Memulihkan tidak membuang cadangan, dan isi container yang sedang tampil dicadangkan dulu.</p>
-        {!backups?.length ? <div className="empty">Belum ada cadangan container.</div> : (
-          <div className="tablewrap" style={{ maxHeight: 'none' }}>
-            <table className="grid">
-              <thead><tr><th>Waktu</th><th>Container</th><th>Jenis</th><th>Baris</th><th>Oleh</th><th>Aksi</th></tr></thead>
-              <tbody>{backups.map((b) => (
-                <tr key={b.id}>
-                  <td>{new Date(b.at).toLocaleString('id-ID')}</td><td>{b.container}</td><td>{KIND_B[b.kind] || 'Cadangan'}</td><td>{b.count}</td><td>{b.by || 'Sistem'}</td>
-                  <td className="actions">
-                    <button className="btn sm" onClick={() => setInfo({ type: 'backup', id: b.id })}><Info size={14} /> Lihat info</button>
-                    <button className="btn sm" disabled={!!busy} onClick={() => pulihC(b)}><RotateCcw size={14} /> Pulihkan</button>
-                    <button className="btn sm danger" disabled={!!busy} onClick={() => dropBackup(b.id)}><Trash2 size={14} /> Buang</button>
-                  </td>
-                </tr>))}</tbody>
-            </table>
+      </>}
+
+      {tab === 'unduh' && (
+        <div className="panel wide">
+          <h3 style={{ marginTop: 0 }}>Unduh semua data</h3>
+          <p className="hint">{groups.length} container · {rows.length} baris saat ini. Unduh berkala dan simpan di tempat lain (Google Drive, flashdisk) agar data tidak hanya bergantung pada satu database.</p>
+          <div className="toolbar wrap">
+            <button className="btn primary" disabled={!groups.length || !!busy} onClick={unduhExcel}><FileSpreadsheet size={15} /> {busy === 'xlsx' ? 'Menyusun…' : 'Unduh Excel (semua container)'}</button>
+            <button className="btn" disabled={!groups.length || !!busy} onClick={unduhJson}><FileJson size={15} /> Unduh cadangan (.json)</button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
       {info && <InfoCard type={info.type} id={info.id} onClose={() => setInfo(null)} />}
       {dialog}
     </>

@@ -68,3 +68,9 @@ AURORA — After-Dark Sign-In - Glassmorphism style from the 2020s Digital era.
 ## Use Case
 
 Glassmorphism apps, Landing pages, Experimental projects.
+
+
+## Catatan perubahan (atas permintaan)
+
+- Tanpa gradien: semua warna solid (kaca = transparansi + blur + garis tepi).
+- Mode gelap dominan hitam / abu netral; biru palet hanya untuk aksen kecil.

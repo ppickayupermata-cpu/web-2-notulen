@@ -40,7 +40,8 @@ input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
 .grid tr.picked td{background:#fdecec}.cell{text-align:center}
 .box{border:1px solid var(--line);border-radius:8px;overflow:hidden;min-width:76px;background:var(--field)}
 .box .v{min-height:26px;display:flex;align-items:center;justify-content:center;padding:2px 6px}
-.box .p{font-size:12px;text-align:center;padding:2px 4px;border-top:1px solid var(--line);background:linear-gradient(to right,var(--prog) var(--p),var(--rn) var(--p))}
+.box .p{position:relative;isolation:isolate;font-size:12px;text-align:center;padding:2px 4px;border-top:1px solid var(--line);background:var(--rn)}
+.box .p::before{content:"";position:absolute;inset:0 auto 0 0;width:var(--p);background:var(--prog);z-index:-1}
 .box.done{border-color:var(--ok);outline:2px solid var(--ok);outline-offset:-1px}.box.done .p{background:#d7f3e1;color:var(--ok);font-weight:600}
 .box.wide{min-width:130px}.box.wide .v{font-size:16px;min-height:30px}
 .totalbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px 0}
@@ -154,7 +155,7 @@ input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
 .msg.warn{background:#fff7e0;color:#7a5200;border:1px solid #f3d98b;padding:8px 12px;border-radius:8px;margin:8px 0}
 [data-theme=dark] .msg.warn{background:#3b3517;color:#fde68a;border-color:#6b5a1f}
 .chip-st.up-baru{background:#dcfce7;color:#166534;margin:0}.chip-st.up-berubah{background:#fef3c7;color:#92400e;margin:0}.chip-st.up-sama{background:#e5e7eb;color:#374151;margin:0}
-[data-theme=dark] .chip-st.up-baru{background:#123a2b;color:#86efac}[data-theme=dark] .chip-st.up-berubah{background:#3b3517;color:#fde68a}[data-theme=dark] .chip-st.up-sama{background:#2b3150;color:#cbd0e6}
+[data-theme=dark] .chip-st.up-baru{background:#123a2b;color:#86efac}[data-theme=dark] .chip-st.up-berubah{background:#3b3517;color:#fde68a}[data-theme=dark] .chip-st.up-sama{background:#2b2d33;color:#d6d9e0}
 .grid tr.up-baru td{background:rgba(22,163,74,.10)}.grid tr.up-berubah td{background:rgba(245,158,11,.12)}
 .updiff{margin-top:8px}.toolbar.wrap{flex-wrap:wrap;gap:8px}
 .chip-st.up-hilang{background:#fee2e2;color:#991b1b;margin:0}[data-theme=dark] .chip-st.up-hilang{background:#451a1a;color:#fca5a5}
@@ -209,7 +210,7 @@ kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;paddi
 .sc{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:12.5px;padding:4px 11px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
 button.sc{cursor:pointer}button.sc:hover{border-color:var(--accent)}.sc.zero{opacity:.55}
 .sc.ok{background:#dcfce7;border-color:#bbf7d0;color:#166534}.sc.late{background:#fee2e2;border-color:#fecaca;color:#991b1b;font-weight:600}.sc.due{background:#fef3c7;border-color:#fde68a;color:#92400e}.sc.warn{background:#e0e7ff;border-color:#c7d2fe;color:#3730a3}.sc.area.on{background:var(--accent);border-color:var(--accent);color:#fff}
-[data-theme=dark] .sc.ok{background:#123a2b;border-color:#14532d;color:#86efac}[data-theme=dark] .sc.late{background:#451a1a;border-color:#7f1d1d;color:#fca5a5}[data-theme=dark] .sc.due{background:#3b3517;border-color:#6b5a1f;color:#fde68a}[data-theme=dark] .sc.warn{background:#232850;border-color:#3b4280;color:#c7d2fe}
+[data-theme=dark] .sc.ok{background:#123a2b;border-color:#14532d;color:#86efac}[data-theme=dark] .sc.late{background:#451a1a;border-color:#7f1d1d;color:#fca5a5}[data-theme=dark] .sc.due{background:#3b3517;border-color:#6b5a1f;color:#fde68a}[data-theme=dark] .sc.warn{background:#262A33;border-color:#3A3F4A;color:#BAD6EB}
 .sonav select{max-width:260px}
 /* Cetak: hanya tabel (atau halaman notulen) yang tercetak */
 @media print{
@@ -264,7 +265,6 @@ button.sc{cursor:pointer}button.sc:hover{border-color:var(--accent)}.sc.zero{opa
 
 /* Header (judul kolom) semua tabel berwarna biru agar mudah dibedakan dari isi tabel */
 :root{--th-bg:#1d4ed8;--th-in:#3b82f6;--th-ink:#fff}
-[data-theme=dark]{--th-bg:#1e3a8a;--th-in:#2563eb}
 .grid th,.logtbl th{background:var(--th-bg)!important;color:var(--th-ink)!important}
 .grid th.in{background:var(--th-in)!important}
 .grid th .rz:hover{background:#fff}.grid th button,.grid th .icon-btn{color:var(--th-ink)}
@@ -287,22 +287,13 @@ button.sc{cursor:pointer}button.sc:hover{border-color:var(--accent)}.sc.zero{opa
 .grid td.cursorcell::after{content:attr(data-who);position:absolute;left:-2px;top:-17px;z-index:5;background:#f59e0b;color:#1f1300;font:700 11px/1 sans-serif;padding:2px 6px;border-radius:5px 5px 5px 0;white-space:nowrap;pointer-events:none}
 .icon-btn.on{background:var(--accent-soft);color:var(--accent)}
 
-/* Watermark "La Von So" — liquid glass, kanan bawah */
-.wm{position:fixed;right:26px;bottom:10px;z-index:6;pointer-events:none;user-select:none;-webkit-user-select:none;overflow:hidden;padding:5px 16px 6px;border-radius:999px;
+/* Watermark — kaca datar (transparan + blur), warna solid, kanan bawah */
+.wm{position:fixed;right:26px;bottom:10px;z-index:6;pointer-events:none;user-select:none;-webkit-user-select:none;padding:5px 16px 6px;border-radius:999px;
   font:700 13px/1.15 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.09em;opacity:.9;
-  background:linear-gradient(135deg,rgba(255,255,255,.62),rgba(255,255,255,.14) 55%,rgba(160,170,255,.22));
-  -webkit-backdrop-filter:blur(10px) saturate(1.9) contrast(1.05);backdrop-filter:blur(10px) saturate(1.9) contrast(1.05);
-  border:1px solid rgba(255,255,255,.7);
-  box-shadow:0 8px 24px rgba(60,70,140,.2),inset 0 1.5px 1px rgba(255,255,255,.95),inset 0 -3px 7px rgba(110,120,230,.22),inset 1.5px 0 2px rgba(255,255,255,.5)}
-.wm span{position:relative;background:linear-gradient(100deg,#4338ca,#0891b2 52%,#7c3aed);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 1px 0 rgba(255,255,255,.7))}
-.wm::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 38%,rgba(255,255,255,.8) 50%,transparent 62%);transform:translateX(-130%);animation:wmsheen 7s ease-in-out infinite}
-@keyframes wmsheen{0%,72%{transform:translateX(-130%)}100%{transform:translateX(130%)}}
-[data-theme=dark] .wm{background:linear-gradient(135deg,rgba(255,255,255,.2),rgba(255,255,255,.05) 55%,rgba(130,140,255,.16));border-color:rgba(255,255,255,.3);
-  box-shadow:0 8px 24px rgba(0,0,0,.45),inset 0 1.5px 1px rgba(255,255,255,.4),inset 0 -3px 7px rgba(120,130,255,.2)}
-[data-theme=dark] .wm span{background:linear-gradient(100deg,#a5b4fc,#67e8f9 52%,#c4b5fd);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+  background:var(--glass);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid var(--edge);box-shadow:var(--hi),var(--shadow)}
+.wm span{color:var(--accent)}
 .statfoot{padding-right:170px}   /* teks bilah status tidak menabrak watermark */
 @media (max-width:640px){.wm{right:14px;bottom:6px;font-size:11px;padding:3px 11px 4px}.statfoot{padding-right:120px}}
-@media (prefers-reduced-motion:reduce){.wm::after{animation:none}}
 @media print{.wm{display:none!important}}
 
 /* label data lama / baru pada baris (hasil gabung / pindah data) */
@@ -349,3 +340,24 @@ h2{line-height:1.3}
 
 /* chip di dalam sel tabel / toolbar sejajar dengan teks (bawaan chip memberi margin atas 8px untuk tampilan kartu) */
 .grid .chip-st,.toolbar .chip-st,.panel .chip-st{margin-top:0;vertical-align:middle}
+
+/* ---- satu scroll saja: pada halaman berisi tabel, hanya tabel yang bisa digulir (kanan-kiri dan atas-bawah) ---- */
+.content.fill>*{flex-shrink:0}
+.content.fill>.tablewrap{flex:0 1 auto;min-height:0;max-height:none!important;border-radius:var(--r-md,8px)}
+.content.fill{min-width:0}
+.content:not(.fill) .tablewrap{max-height:none}      /* halaman biasa: scroll atas-bawah hanya milik halaman, tidak bersarang */
+
+/* kelompok per container di dalam tabel (Cadangan, Riwayat) */
+.grid tr.grp td{background:var(--accent-soft);color:var(--ink);font-weight:600;border-top:2px solid var(--grid-edge,var(--line));white-space:normal}
+/* ---- tabel tidak tiba-tiba melebar saat teks panjang ---- */
+.grid:not(.fx){table-layout:auto;width:100%}
+.grid:not(.fx) td,.grid:not(.fx) th{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grid:not(.fx) td.wrap{white-space:normal;overflow-wrap:anywhere;min-width:220px;max-width:520px}
+.grid:not(.fx) td.actions{max-width:none;white-space:normal;overflow:visible}
+.grid:not(.fx) th:last-child{max-width:none}
+.grid.fx td{overflow:hidden;text-overflow:ellipsis}
+.grid.fx td input,.grid.fx td textarea{max-width:100%;box-sizing:border-box}
+
+.cari-sec{display:flex;align-items:center;gap:8px;margin:8px 6px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.cari-sec i{font-style:normal;padding:0 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.spin{animation:aurSpin 1s linear infinite;color:var(--mute)}@keyframes aurSpin{to{transform:rotate(360deg)}}

@@ -9,5 +9,5 @@ import './styles.css'
 import './aurora.css'
 // Link QR absensi (?absen=ID) membuka halaman absen publik tanpa login
 // Link live read-only (?live=TOKEN) juga publik: hanya melihat, tanpa login
-const q = new URLSearchParams(location.search), absen = q.get('absen'), live = q.get('live')
-createRoot(document.getElementById('root')).render(<UiProvider>{live ? <LiveView token={live} /> : absen ? <AbsenRoom id={absen} /> : <App />}<Watermark /></UiProvider>)
+const q = new URLSearchParams(location.search), absen = q.get('absen'), live = q.get('live'), meet = q.get('meeting') // ?meeting= : live yang otomatis mengikuti container yang dibuka host
+createRoot(document.getElementById('root')).render(<UiProvider>{meet ? <LiveView token={meet} meeting /> : live ? <LiveView token={live} /> : absen ? <AbsenRoom id={absen} /> : <App />}<Watermark /></UiProvider>)

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRightLeft } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
+import { useFill } from '../utils/useFill.js'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { bandingkan, rencanaPindah } from '../utils/diffRows.js'
 
@@ -10,6 +11,7 @@ import { bandingkan, rencanaPindah } from '../utils/diffRows.js'
 export default function PindahData({ groupId, onBack }) {
   const { groups, rows, moveRows } = useData()
   const { confirm, dialog } = useConfirm()
+  useFill()
   const asal = groups.find((g) => g.id === groupId)
   const lain = groups.filter((g) => g.id !== groupId)
   const [toId, setToId] = useState(() => lain[lain.length - 1]?.id || '')

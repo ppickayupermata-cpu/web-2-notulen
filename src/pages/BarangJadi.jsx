@@ -15,7 +15,7 @@ const tgl = (v) => (v ? new Date(v).toLocaleString('id-ID') : '-')
 export default function BarangJadi() {
   const { finished, finishedRows, unfinishRows } = useData()
   const { confirm, dialog } = useConfirm()
-  const [f, setF] = useState(G0), [msg, setMsg] = useState(null), [busy, setBusy] = useState(false)
+  const [f, setF] = useState(() => { let q = ''; try { q = sessionStorage.getItem('pl_q') || ''; sessionStorage.removeItem('pl_q') } catch { /* mode privat */ } return { ...G0, q } }), [msg, setMsg] = useState(null), [busy, setBusy] = useState(false)
   const [view, setView] = useState(null)   // { group, rows }
   const shown = filterGroups(finished || [], f)
 
@@ -57,7 +57,7 @@ export default function BarangJadi() {
   return (
     <>
       <p className="hint">SO yang sudah selesai disimpan di sini dari tombol <b>Simpan ke list Barang Jadi</b> pada tabel Input. Tidak ikut terhapus otomatis, dan bisa dikembalikan kapan saja.</p>
-      <FilterBar fields={GROUP_FIELDS} value={f} onChange={(v) => { setF(v); setMsg(null) }} onClear={() => setF(G0)} />
+      <FilterBar fields={GROUP_FIELDS} scope="Container, Buyer, Packing List" value={f} onChange={(v) => { setF(v); setMsg(null) }} onClear={() => setF(G0)} />
       <div className="count">{shown.length} container di Barang Jadi</div>
       {msg && <div className={'msg ' + msg.type}>{msg.text}</div>}
       {!shown.length ? <div className="empty">{finished?.length ? 'Tidak ada container yang cocok.' : 'Belum ada barang jadi. Buka Input pada sebuah container, lalu klik Simpan ke list Barang Jadi di header SO.'}</div> : (

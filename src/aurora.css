@@ -1,118 +1,105 @@
-/* AURORA — Glass Liquid theme (lihat DESIGN.md). Terang dan gelap, satu sumber token.
+/* AURORA glass — tema terang dan gelap (lihat DESIGN.md). WARNA SOLID SAJA: tidak ada gradien di mana pun.
    Palet (gambar): Royal 334EAC · Moon F7F2EB · China 7096D1 · Asian Pear F2F0DE · Midnight 081F5C · Dawn D0E3FF · Jicama FFF9F0 · Porcelain EDF1F6 · Sky BAD6EB
-   Turunan (hanya bayangan Midnight): deep #050F33 dan raised #12307A, dipakai di mode gelap.
-   Ringan: tanpa font/gambar eksternal, tanpa lapisan blur layar penuh. backdrop-filter hanya di bilah atas, kartu login, dan dialog terbuka.
-   "Liquid" dibuat dari gradasi: sorot cahaya di sudut kiri atas, garis terang di tepi atas, dan kilau yang menyapu tombol saat hover. */
+   Terang: palet biru-krem apa adanya. Gelap: dominan HITAM / abu gelap netral; biru hanya sebagai aksen kecil (fokus, tombol utama, kolom input), bukan latar.
+   Ringan: tanpa font / gambar eksternal; backdrop-filter hanya di bilah atas, kartu login, dan dialog terbuka. */
 :root{
   --royal:#334EAC;--moon:#F7F2EB;--china:#7096D1;--pear:#F2F0DE;--midnight:#081F5C;--dawn:#D0E3FF;--jicama:#FFF9F0;--porcelain:#EDF1F6;--sky:#BAD6EB;
   /* ===== TERANG ===== */
   --bg:#EDF1F6;--card:#FFF9F0;--ink:#081F5C;--mute:#4B5F94;--line:#D3E2F1;
   --accent:#334EAC;--accent-soft:#D0E3FF;--packed:#D9F0E5;--edit:#D0E3FF;--ok:#167A55;--err:#C73550;
   --th-bg:#081F5C;--th-in:#334EAC;--th-ink:#F7F2EB;
-  --field:rgba(255,255,255,.82);--btn:linear-gradient(145deg,#fff,#EDF1F6);--pop:#FFF9F0;
+  --field:rgba(255,255,255,.85);--btn:#FFFFFF;--pop:#FFF9F0;
   --hover:#E8F0FD;--rn:#EDF1F6;--rng:#D0E3FF;--prog:#BAD6EB;--grid-line:#9DB5DD;--grid-edge:#334EAC;
-  --edge:rgba(112,150,209,.38);
-  --glass:linear-gradient(145deg,rgba(255,255,255,.82),rgba(208,227,255,.42));--spec:rgba(255,255,255,.9);
-  --bar:rgba(247,242,235,.68);--side:linear-gradient(180deg,rgba(255,249,240,.72),rgba(208,227,255,.36));
-  --hi:inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(112,150,209,.14);
-  --shadow:0 16px 36px -22px rgba(8,31,92,.5);--neu:4px 4px 10px rgba(112,150,209,.22),-4px -4px 10px rgba(255,255,255,.95);
-  --title:linear-gradient(110deg,#081F5C,#334EAC 60%,#7096D1);
-  --grad:linear-gradient(110deg,#081F5C,#334EAC);--grad-ink:#F7F2EB;--sheen:linear-gradient(115deg,transparent 38%,rgba(255,255,255,.6) 50%,transparent 62%);
-  --navon:linear-gradient(110deg,rgba(208,227,255,.95),rgba(186,214,235,.7));--navon-ink:#081F5C;--navon-bar:#334EAC;
-  --danger:linear-gradient(110deg,#D0425D,#B02D49);--danger-ink:#fff;
-  --overlay:rgba(8,31,92,.38);--blob1:rgba(186,214,235,.75);--blob2:rgba(208,227,255,.95);--blob3:rgba(112,150,209,.28);
-  --page:radial-gradient(820px 460px at 4% -10%,rgba(208,227,255,.95),transparent 65%),radial-gradient(760px 460px at 100% 0,rgba(186,214,235,.7),transparent 65%),radial-gradient(900px 500px at 50% 118%,rgba(247,242,235,.95),transparent 60%);
+  --edge:rgba(112,150,209,.4);--glass:rgba(255,255,255,.72);--bar:rgba(247,242,235,.78);--side:rgba(255,249,240,.72);
+  --hi:inset 0 1px 0 rgba(255,255,255,.95);--shadow:0 10px 26px -18px rgba(8,31,92,.45);
+  --neu:3px 3px 8px rgba(112,150,209,.2),-3px -3px 8px rgba(255,255,255,.95);
+  --solid:#334EAC;--solid-ink:#F7F2EB;--navon:#D0E3FF;--navon-ink:#081F5C;--navon-bar:#334EAC;
+  --danger:#C73550;--danger-ink:#FFFFFF;--overlay:rgba(8,31,92,.38);
   --r-sm:4px;--r-md:8px;--r-lg:16px;
 }
 [data-theme=dark]{
-  /* ===== GELAP (aurora glass liquid) ===== */
-  --bg:#050F33;--card:#081F5C;--ink:#F7F2EB;--mute:#7096D1;--line:#173783;
-  --accent:#BAD6EB;--accent-soft:#12307A;--packed:#0C4A47;--edit:#12307A;--ok:#5EE0B0;--err:#FF8FA3;
-  --th-bg:#12307A;--th-in:#334EAC;--th-ink:#F7F2EB;
-  --field:rgba(5,15,51,.55);--btn:linear-gradient(145deg,rgba(51,78,172,.5),rgba(8,31,92,.85));--pop:#0B2766;
-  --hover:#0E2A70;--rn:#0B2766;--rng:#1B3C99;--prog:#334EAC;--grid-line:rgba(112,150,209,.42);--grid-edge:#7096D1;
-  --edge:rgba(186,214,235,.2);
-  --glass:linear-gradient(145deg,rgba(51,78,172,.32),rgba(8,31,92,.64));--spec:rgba(186,214,235,.22);
-  --bar:rgba(8,31,92,.6);--side:linear-gradient(180deg,rgba(18,48,122,.64),rgba(8,31,92,.52));
-  --hi:inset 0 1px 0 rgba(247,242,235,.22),inset 0 -1px 0 rgba(0,0,0,.3);
-  --shadow:0 18px 40px -22px rgba(0,0,0,.85);--neu:4px 4px 12px rgba(2,8,28,.6),-3px -3px 10px rgba(51,78,172,.22);
-  --title:linear-gradient(110deg,#F7F2EB,#BAD6EB 55%,#7096D1);
-  --grad:linear-gradient(110deg,#BAD6EB,#7096D1);--grad-ink:#081F5C;--sheen:linear-gradient(115deg,transparent 38%,rgba(247,242,235,.38) 50%,transparent 62%);
-  --navon:linear-gradient(110deg,rgba(51,78,172,.62),rgba(112,150,209,.2));--navon-ink:#F7F2EB;--navon-bar:#BAD6EB;
-  --danger:linear-gradient(110deg,#FF8FA3,#E05577);--danger-ink:#2C0613;
-  --overlay:rgba(2,8,28,.62);--blob1:rgba(51,78,172,.55);--blob2:rgba(112,150,209,.3);--blob3:rgba(186,214,235,.16);
-  --page:radial-gradient(820px 480px at 4% -10%,rgba(51,78,172,.55),transparent 65%),radial-gradient(760px 460px at 100% 0,rgba(112,150,209,.24),transparent 65%),radial-gradient(900px 520px at 50% 118%,rgba(18,48,122,.8),transparent 62%);
+  /* ===== GELAP: hitam + abu netral ===== */
+  --bg:#08090B;--card:#121316;--ink:#F7F2EB;--mute:#A7ACB8;--line:#2B2D33;
+  --accent:#BAD6EB;--accent-soft:#1F2229;--packed:#0F3A2E;--edit:#20242C;--ok:#5EE0B0;--err:#FF8FA3;
+  --th-bg:#1C1E24;--th-in:#334EAC;--th-ink:#F7F2EB;
+  --field:rgba(255,255,255,.06);--btn:#1B1D22;--pop:#17181C;
+  --hover:#1A1C21;--rn:#17181C;--rng:#262A33;--prog:#334EAC;--grid-line:rgba(255,255,255,.14);--grid-edge:rgba(255,255,255,.34);
+  --edge:rgba(255,255,255,.14);--glass:rgba(24,25,29,.74);--bar:rgba(10,11,13,.8);--side:rgba(14,15,18,.85);
+  --hi:inset 0 1px 0 rgba(255,255,255,.08);--shadow:0 14px 34px -20px rgba(0,0,0,.9);
+  --neu:3px 3px 10px rgba(0,0,0,.6),-2px -2px 8px rgba(255,255,255,.03);
+  --solid:#BAD6EB;--solid-ink:#081F5C;--navon:#23262E;--navon-ink:#F7F2EB;--navon-bar:#7096D1;
+  --danger:#FF8FA3;--danger-ink:#2C0613;--overlay:rgba(0,0,0,.66);
 }
-body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--page),var(--bg);color:var(--ink)}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
 h2{font-weight:700;letter-spacing:-.01em}
 
 /* ---- kerangka ---- */
-:root .shellbar{background:var(--bar);-webkit-backdrop-filter:blur(12px) saturate(1.4);backdrop-filter:blur(12px) saturate(1.4);border-bottom:1px solid var(--edge);box-shadow:var(--hi)}
-:root .shellbar>b{background:var(--title);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+:root .shellbar{background:var(--bar);-webkit-backdrop-filter:blur(12px) saturate(1.3);backdrop-filter:blur(12px) saturate(1.3);border-bottom:1px solid var(--edge);box-shadow:var(--hi)}
+:root .shellbar>b{color:var(--ink)}
 :root .sidebar{background:var(--side);border-right:1px solid var(--edge);box-shadow:var(--hi)}
 :root .nav{border-radius:var(--r-md);color:var(--mute);transition:background-color .18s,transform .18s,color .18s}
 :root .nav:hover{background:var(--accent-soft);color:var(--ink);transform:translateX(2px)}
-:root .nav.active{background:var(--navon);color:var(--navon-ink);box-shadow:inset 3px 0 0 var(--navon-bar),var(--hi)}
+:root .nav.active{background:var(--navon);color:var(--navon-ink);box-shadow:inset 3px 0 0 var(--navon-bar)}
 :root .icon-btn{border-radius:var(--r-md);color:var(--ink);transition:background-color .18s,transform .18s}
 :root .icon-btn:hover{background:var(--accent-soft);transform:translateY(-1px)}
 :root .savestat{border-radius:var(--r-md);border:1px solid var(--edge);background:var(--field)}
 :root .content{padding:1rem 2rem}
 
-/* ---- panel, filter: kaca cair (sorot sudut kiri atas + garis terang) ---- */
-:root .filterbar,:root .panel{background:radial-gradient(120% 100% at 0% 0%,var(--spec),transparent 46%),var(--glass);border:1px solid var(--edge);border-radius:var(--r-lg);box-shadow:var(--hi),var(--shadow)}
+/* ---- panel, pencarian: kaca datar (transparan + garis tepi), tanpa gradien ---- */
+:root .panel{background:var(--glass);border:1px solid var(--edge);border-radius:var(--r-lg);box-shadow:var(--hi),var(--shadow)}
 :root .tablewrap{background:var(--card);border-radius:var(--r-lg);box-shadow:0 0 0 1px var(--edge),var(--shadow)}
 :root .fillpage>.tablewrap{border-radius:var(--r-md) var(--r-md) 0 0}
-:root .empty{background:radial-gradient(120% 100% at 0% 0%,var(--spec),transparent 46%),var(--glass);border:1px dashed var(--mute);border-radius:var(--r-lg)}
+:root .empty{background:var(--glass);border:1px dashed var(--mute);border-radius:var(--r-lg)}
 :root .menu{border:1px solid var(--edge);border-radius:var(--r-md);box-shadow:var(--hi),var(--shadow)}
 :root .dropzone{border:2px dashed var(--mute);border-radius:var(--r-lg);background:var(--glass);transition:border-color .18s,background-color .18s}
 :root .dropzone:hover,:root .dropzone.over{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
 :root .chip-st{border-radius:var(--r-sm)}
 :root .msg.warn,:root .banner{border-radius:var(--r-md)}
 
-/* ---- isian & tombol: neumorphism + kilau cair saat hover ---- */
+/* ---- pencarian horizontal (flex): satu baris, kolom menyesuaikan lebar, turun baris bila sempit ---- */
+:root .filterbar{display:flex;flex-flow:row wrap;align-items:flex-end;gap:10px 14px;padding:10px 14px;margin:8px 0;background:var(--glass);border:1px solid var(--edge);border-radius:var(--r-lg);box-shadow:var(--hi)}
+:root .filterbar .ff{display:flex;flex-direction:column;gap:4px;flex:1 1 170px;min-width:140px;font-size:12px;font-weight:600;color:var(--mute)}
+:root .filterbar .ff.q{flex:2 1 280px}
+:root .filterbar .ff input{width:100%;min-width:0}
+:root .filterbar .btn{flex:0 0 auto}
+
+/* ---- isian & tombol ---- */
 :root input,:root select,:root textarea{background:var(--field);color:var(--ink);border:1px solid var(--edge);border-radius:var(--r-md);transition:border-color .18s,box-shadow .18s}
-:root input::placeholder{color:var(--mute);opacity:.75}
-:root input:focus,:root select:focus,:root textarea:focus{outline:0;border-color:var(--china);box-shadow:0 0 0 3px rgba(112,150,209,.4)}
-:root .btn{background:var(--sheen) 130% 0/250% 100% no-repeat,var(--btn);color:var(--ink);border:1px solid var(--edge);border-radius:var(--r-md);box-shadow:var(--neu);transition:background-position .7s ease,transform .18s,box-shadow .18s,border-color .18s}
-:root .btn:hover{background:var(--sheen) -30% 0/250% 100% no-repeat,var(--btn);border-color:var(--china);transform:translateY(-1px)}
+:root input::placeholder{color:var(--mute);opacity:.8}
+:root input:focus,:root select:focus,:root textarea:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px rgba(112,150,209,.35)}
+:root .btn{background:var(--btn);color:var(--ink);border:1px solid var(--edge);border-radius:var(--r-md);box-shadow:var(--neu);transition:transform .18s,box-shadow .18s,border-color .18s,background-color .18s}
+:root .btn:hover{background:var(--accent-soft);border-color:var(--china);transform:translateY(-1px)}
 :root .btn:active{transform:translateY(0)}
 :root .btn:focus-visible,:root .nav:focus-visible,:root .icon-btn:focus-visible{outline:2px solid var(--china);outline-offset:2px}
-:root .btn.primary{background:var(--sheen) 130% 0/250% 100% no-repeat,var(--grad);border-color:transparent;color:var(--grad-ink);font-weight:650;box-shadow:var(--hi),0 10px 22px -12px rgba(51,78,172,.9)}
-:root .btn.primary:hover{background:var(--sheen) -30% 0/250% 100% no-repeat,var(--grad)}
-:root .btn.danger{background:var(--sheen) 130% 0/250% 100% no-repeat,var(--danger);border-color:transparent;color:var(--danger-ink)}
-:root .btn.danger:hover{background:var(--sheen) -30% 0/250% 100% no-repeat,var(--danger)}
+:root .btn.primary{background:var(--solid);border-color:transparent;color:var(--solid-ink);font-weight:650;box-shadow:var(--hi)}
+:root .btn.primary:hover{background:var(--solid);filter:brightness(1.08)}
+:root .btn.danger{background:var(--danger);border-color:transparent;color:var(--danger-ink)}
+:root .btn.danger:hover{background:var(--danger);filter:brightness(1.08)}
 :root .btn.ghost{background:none;box-shadow:none;border-color:transparent;color:var(--mute)}
 :root .btn.on{background:var(--accent-soft);color:var(--accent);border-color:var(--china)}
 :root .btn:disabled{transform:none;box-shadow:none;opacity:.5}
 :root .montabs button,:root .upmode button{background:var(--glass);color:var(--ink);border:1px solid var(--edge);border-radius:var(--r-md);box-shadow:var(--hi);transition:transform .18s,border-color .18s}
 :root .montabs button:hover,:root .upmode button:hover{transform:translateY(-1px);border-color:var(--china)}
-:root .montabs button.on,:root .upmode button.on{background:var(--grad);color:var(--grad-ink);border-color:transparent}
+:root .montabs button.on,:root .upmode button.on{background:var(--solid);color:var(--solid-ink);border-color:transparent}
 :root .montabs button i{background:var(--accent-soft);color:var(--accent)}
-:root .montabs button.on i{background:rgba(255,255,255,.22);color:var(--grad-ink)}
+:root .montabs button.on i{background:rgba(0,0,0,.18);color:var(--solid-ink)}
 
-/* ---- tabel: tetap solid. Hanya warna kisi / baris yang diselaraskan dengan palet ---- */
+/* ---- tabel: solid. Hanya warna kisi / baris yang diselaraskan ---- */
 :root .grid th .rz:hover{background:var(--field)}
 
-/* ---- dialog: blur hanya saat terbuka ---- */
+/* ---- dialog ---- */
 :root .overlay{background:var(--overlay);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
-:root .modal{background:radial-gradient(120% 90% at 0% 0%,var(--spec),transparent 40%),var(--pop);border:1px solid var(--edge);border-radius:var(--r-lg);box-shadow:var(--hi),0 40px 90px -30px rgba(0,0,0,.6);animation:aurPop .18s ease-out}
+:root .modal{background:var(--pop);border:1px solid var(--edge);border-radius:var(--r-lg);box-shadow:var(--hi),0 40px 90px -30px rgba(0,0,0,.6);animation:aurPop .18s ease-out}
 
-/* ---- login: kartu kaca cair + dua cahaya yang melayang (transform saja) ---- */
-:root .login{position:relative;overflow:hidden;background:radial-gradient(700px 420px at 15% 10%,var(--blob2),transparent 65%),radial-gradient(700px 460px at 90% 90%,var(--blob1),transparent 65%),var(--bg)}
-:root .login::before,:root .login::after{content:"";position:absolute;width:260px;height:260px;border-radius:50%;pointer-events:none;background:radial-gradient(closest-side,var(--blob1),transparent);animation:aurFloat 9s ease-in-out infinite}
-:root .login::before{left:calc(50% - 360px);top:18%}
-:root .login::after{left:calc(50% + 120px);bottom:12%;background:radial-gradient(closest-side,var(--blob3),transparent);animation-delay:-4s}
-:root .login .panel{position:relative;z-index:1;width:min(360px,92vw);padding:2rem;-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);animation:aurPop .35s ease-out}
-:root .login h2{font-size:1.5rem;background:var(--title);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;margin-bottom:.25rem}
+/* ---- login: latar polos + kartu kaca ---- */
+:root .login{background:var(--bg)}
+:root .login .panel{width:min(360px,92vw);padding:2rem;-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);animation:aurPop .35s ease-out}
+:root .login h2{font-size:1.5rem;color:var(--ink);margin-bottom:.25rem}
 
-/* ---- gerak mikro: hanya saat elemen muncul ---- */
+/* ---- gerak mikro (hanya saat elemen muncul) ---- */
 @keyframes aurPop{from{opacity:0;transform:translateY(6px) scale(.98)}}
-@keyframes aurFloat{50%{transform:translate3d(0,-22px,0)}}
 :root .panel,:root .filterbar,:root .empty,:root .msg,:root .banner{animation:aurPop .22s ease-out}
 
-@media (max-width:700px){:root .content{padding:.75rem 1rem}:root .login::before,:root .login::after{display:none}}
+@media (max-width:700px){:root .content{padding:.75rem 1rem}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media (prefers-reduced-transparency:reduce){:root .shellbar,:root .login .panel,:root .overlay{-webkit-backdrop-filter:none;backdrop-filter:none}}
-
-/* header SO memuat banyak tombol (Auto-fit, Samakan, Reset ukuran, Barang Jadi): boleh turun baris, tidak bocor */
-:root .sotitle,:root .sotools{flex-wrap:wrap}

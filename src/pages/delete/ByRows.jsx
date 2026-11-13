@@ -6,18 +6,18 @@ import { useData } from '../../context/DataContext.jsx'
 import { filterRows } from '../../utils/filter.js'
 import { showDate, today, tomorrow } from '../../utils/date.js'
 
-const I0 = { so: '', soItem: '', productCode: '' }
+const I0 = { q: '', so: '', soItem: '', productCode: '' }
 
 export default function ByRows({ by }) {
-  const { rows, removeRows, addSchedules } = useData()
+  const { rows, groups, removeRows, addSchedules } = useData()
   const { confirm, dialog } = useConfirm()
   const [f, setF] = useState(I0)
   const [selected, setSelected] = useState([])
   const [date, setDate] = useState('')
   const [msg, setMsg] = useState(null)
 
-  const noFilter = !f.so && !f.soItem && !f.productCode
-  const shown = noFilter ? [] : filterRows(rows, f)
+  const noFilter = !String(f.q || '').trim() && !f.so && !f.soItem && !f.productCode
+  const shown = noFilter ? [] : filterRows(rows, f, groups)
   const picked = selected.filter((id) => shown.some((r) => r.id === id))
   const toggle = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
   const toggleAll = () => setSelected(picked.length === shown.length ? [] : shown.map((r) => r.id))
@@ -48,7 +48,7 @@ export default function ByRows({ by }) {
 
   return (
     <>
-      <FilterBar fields={ITEM_FIELDS} value={f} onChange={(v) => { setF(v); setMsg(null) }} onClear={() => { setF(I0); setSelected([]) }} />
+      <FilterBar fields={ITEM_FIELDS} scope="SO, PO, produk, container di semua container" value={f} onChange={(v) => { setF(v); setMsg(null) }} onClear={() => { setF(I0); setSelected([]) }} />
       <div className="toolbar wrap">
         <button className="btn danger" disabled={!picked.length} onClick={removeNow}>Hapus sekarang ({picked.length})</button>
         <span className="sep" />

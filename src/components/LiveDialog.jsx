@@ -15,6 +15,7 @@ export default function LiveDialog({ group, onClose }) {
       <div className="modal pantau" role="dialog" aria-modal="true" aria-label="Link live" onClick={(e) => e.stopPropagation()}>
         <div className="toolbar"><h3 style={{ margin: 0 }}><Radio size={18} style={{ verticalAlign: '-3px' }} /> Link live · Container {group.container}</h3><span className="spacer" /><button className="icon-btn" aria-label="Tutup" onClick={onClose}><X size={18} /></button></div>
         <p className="hint">Siapa pun yang memegang link ini bisa <b>melihat</b> isi container secara langsung (otomatis ter-update), tanpa login dan tanpa bisa mengubah apa pun.</p>
+        <p className="hint">Link ini hanya menampilkan container ini. Untuk satu link yang <b>otomatis berpindah</b> mengikuti container yang sedang Anda edit, pakai <b>Link live meeting</b> di tombol <b>Absensi &amp; Meeting</b> (Monitoring).</p>
         {l === null && <div className="empty">Memuat…</div>}
         {l === false && <div className="msg err">Gagal membuat link live. Coba lagi.</div>}
         {l && <>

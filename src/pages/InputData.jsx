@@ -6,6 +6,7 @@ import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { filterGroups, filterRows } from '../utils/filter.js'
 import { colsFor, isCoAds } from '../config.js'
+import { useFill } from '../utils/useFill.js'
 import { PackageCheck } from 'lucide-react'
 import { infoPindahSo } from '../utils/barangJadi.js'
 import Notulen from '../components/Notulen.jsx'
@@ -84,7 +85,7 @@ export default function InputData({ groupId, onBack }) {
 
   // satu halaman penuh tanpa scroll halaman: hanya tabel yang bisa digulir
   const penuh = !!open
-  useEffect(() => { const c = document.querySelector('.content'); if (!penuh || !c) return; c.classList.add('fill'); return () => c.classList.remove('fill') }, [penuh])
+  useFill(penuh)
 
   // Simpan satu SO (semua barisnya di container ini) ke list Barang Jadi; tombol muncul di header setiap SO
   const keBarangJadi = async (so) => {
@@ -117,7 +118,7 @@ export default function InputData({ groupId, onBack }) {
           <button className="btn" onClick={cancel} disabled={!changed}><X size={15} /> Batal</button>
           {msg && <span className="msg ok">{msg}</span>}
         </div>
-        {showFilter && <FilterBar fields={isCoAds(open) ? ITEM_FIELDS_COADS : ITEM_FIELDS} value={fi} onChange={setFi} onClear={() => setFi(I0)} />}
+        {showFilter && <FilterBar fields={isCoAds(open) ? ITEM_FIELDS_COADS : ITEM_FIELDS} scope="isi container ini: SO, PO, produk, AREA, keterangan" value={fi} onChange={setFi} onClear={() => setFi(I0)} />}
         <DataTable fileName={`Container-${open.container}`} cols={cols} soActions={soActions} rows={shown} manage groupId={open.id} editable={editable} editing={editing} compactTools leadExtras={<button className={'btn sm' + (showFilter ? ' on' : '')} aria-pressed={showFilter} onClick={() => setShowFilter((v) => !v)} title="Tampilkan / sembunyikan filter SO, SO Item, Product Code"><Filter size={14} /> Filter{Object.values(fi).some(Boolean) ? ' •' : ''}</button>} getValue={getValue} onChange={change} onChangeMany={changeMany} onCursor={setCursor} onNotulen={(c) => { calcRef.current = c; setNt(true) }} onPack={tagPacking} />
         {nt && <Notulen calc={calcRef.current} group={open} rows={rows.filter((r) => r.groupId === open.id)} onClose={() => setNt(false)} />}
         {dialog}
@@ -130,7 +131,7 @@ export default function InputData({ groupId, onBack }) {
   return (
     <>
       <h2>Input Data</h2>
-      <FilterBar fields={GROUP_FIELDS} value={f} onChange={setF} onClear={() => setF(G0)} />
+      <FilterBar fields={GROUP_FIELDS} scope="Container, Buyer, Packing List" value={f} onChange={setF} onClear={() => setF(G0)} />
       <div className="count">{shown.length} packing list {msg && <span className="msg ok"> · {msg}</span>}</div>
       <GroupList
         groups={shown} rows={rows}

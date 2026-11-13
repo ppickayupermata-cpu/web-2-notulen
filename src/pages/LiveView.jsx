@@ -14,21 +14,26 @@ const todayISO = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 const CW = 150 // lebar dasar satu kolom (px)
 
-export default function LiveView({ token }) {
+export default function LiveView({ token, meeting = false }) { // meeting: link live meeting, otomatis berpindah ke container yang dibuka host
   const { theme, toggleTheme } = useUi()
   const [d, setD] = useState(null), [err, setErr] = useState(''), [at, setAt] = useState(null), [q, setQ] = useState('')
   const [flash, setFlash] = useState(() => new Set()), prev = useRef(null)
   const [scale, setScale] = useState(() => { try { return clamp(+localStorage.getItem('pl_live_zoom') || 1, 0.3, 3) } catch { return 1 } })
   const [full, setFull] = useState(false), [follow, setFollow] = useState(false)
   const page = useRef(null), vp = useRef(null), pan = useRef(null)
+  const lastC = useRef(null), [waiting, setWaiting] = useState(false), [switched, setSwitched] = useState('')
 
   useEffect(() => {
     let on = true, stop = false, timer = 0
     const load = async () => {
       try {
-        const r = await fetch('/api/live?t=' + encodeURIComponent(token)), x = await r.json().catch(() => ({}))
+        const r = await fetch((meeting ? '/api/live?m=' : '/api/live?t=') + encodeURIComponent(token)), x = await r.json().catch(() => ({}))
         if (!on) return
         if (!r.ok) { setErr(x.error || 'Tidak bisa memuat data.'); if (r.status === 404 || r.status === 403) { stop = true; setD(false) } return }
+        if (x.waiting) { setWaiting(true); setErr(''); setAt(new Date()); return }   // host belum membuka container mana pun
+        setWaiting(false)
+        if (meeting && lastC.current && lastC.current !== x.group.container) { prev.current = null; setSwitched(x.group.container); setTimeout(() => on && setSwitched(''), 6000); vp.current?.scrollTo?.(0, 0) } // host pindah container: ikut pindah, tanpa menyorot semua baris sebagai "berubah"
+        lastC.current = x.group.container
         const cur = new Map(x.rows.map((o) => [o.id, JSON.stringify(o)])), ch = new Set()
         if (prev.current) cur.forEach((v, k) => { if (prev.current.get(k) !== v) ch.add(k) }) // baris baru / berubah sejak pembaruan sebelumnya
         prev.current = cur
@@ -39,7 +44,7 @@ export default function LiveView({ token }) {
     const tick = async () => { if (!stop && !document.hidden) await load(); if (on && !stop) timer = setTimeout(tick, 2000) }
     tick()
     return () => { on = false; clearTimeout(timer) }
-  }, [token])
+  }, [token, meeting])
 
   // ---- isian admin yang belum di-Submit ditumpuk di atas data tersimpan ----
   const pr = d?.presence || null
@@ -91,8 +96,8 @@ export default function LiveView({ token }) {
     <div ref={page} className={'livepage' + (full ? ' live-full' : '')}>
       {!full && <>
         <div className="live-head">
-          <span className="live-badge"><Radio size={14} /> LIVE</span>
-          <b>Container {d?.group?.container || '…'}</b>{d?.group?.buyer && <span className="hint">Buyer {d.group.buyer}</span>}{d?.group?.packingListNo && <span className="hint">{d.group.packingListNo}</span>}
+          <span className="live-badge"><Radio size={14} /> LIVE{meeting ? ' MEETING' : ''}</span>
+          <b>Container {d?.group?.container || '…'}</b>{meeting && <span className="chip-st buka" style={{ margin: 0 }} title="Tampilan berpindah otomatis ke container yang sedang dibuka host">Mengikuti host</span>}{d?.group?.buyer && <span className="hint">Buyer {d.group.buyer}</span>}{d?.group?.packingListNo && <span className="hint">{d.group.packingListNo}</span>}
           <span className="spacer" />
           {pr && (pr.editing || nDraft > 0) && <span className="live-edit" role="status"><Pencil size={13} /> {pr.editor} sedang mengedit{nDraft ? ` · ${nDraft} baris belum disimpan` : ''}</span>}
           <span className="hint">Hanya melihat{at ? ` · diperbarui ${jamStr(at)}` : ''}</span>
@@ -101,6 +106,7 @@ export default function LiveView({ token }) {
           <button className="icon-btn" onClick={toggleTheme} aria-label="Ganti tema" title="Ganti tema">{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</button>
           <button className="icon-btn" onClick={toggleFull} aria-label="Layar penuh" title="Layar penuh"><Maximize size={18} /></button>
         </div>
+        {switched && <div className="msg okmsg" role="status">Host pindah ke Container {switched}.</div>}
         {err && <div className="msg err" role="alert">{err}</div>}
         {d && <div className="sumbar">
           <span className="sc ok"><PackageCheck size={14} /> Dipacking {rowsAll.length - un.length}/{rowsAll.length}</span>
@@ -110,7 +116,8 @@ export default function LiveView({ token }) {
         </div>}
       </>}
       {d === false && <div className="empty">Link live tidak bisa dipakai. Minta link terbaru dari PPIC.</div>}
-      {d === null && !err && <div className="empty">Memuat…</div>}
+      {d === null && !err && !waiting && <div className="empty">Memuat…</div>}
+      {waiting && !d && <div className="empty">Menunggu host membuka sebuah container…</div>}
       {d && <div ref={vp} className="live-vp" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
         <div className="live-zoom" style={{ zoom: scale }}>
           {!rows.length && <div className="empty">Tidak ada baris yang cocok.</div>}

@@ -28,7 +28,15 @@ export default function Shell({ user, onLogout }) {
     window.addEventListener('online', on); window.addEventListener('offline', off); window.addEventListener('keydown', key)
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); window.removeEventListener('keydown', key) }
   }, [])
-  const pick = (r) => { setJump({ groupId: r.groupId, so: r.so }); setPage('monitoring'); setCari(false) }
+  const [navKey, setNavKey] = useState(0)   // memaksa halaman tujuan dibuka ulang agar membaca tab / kata cari dari hasil pencarian
+  const pick = (it) => { // it dari CariGlobal: isi container | jadwal hapus | barang jadi | cadangan
+    const simpan = (k, v) => { try { sessionStorage.setItem(k, v) } catch { /* mode privat */ } }
+    if (it.kind === 'isi') { setJump({ groupId: it.r.groupId, so: it.r.so }); setPage('monitoring') }
+    else if (it.kind === 'jadwal') setPage('delete')
+    else if (it.kind === 'barang') { simpan('pl_mon_tab', 'barang'); simpan('pl_q', it.container); setNavKey((k) => k + 1); setPage('monitoring') }
+    else { simpan('pl_cad_tab', it.kind === 'penuh' ? 'penuh' : 'container'); simpan('pl_q', it.container || ''); setNavKey((k) => k + 1); setPage('cadangan') }
+    setCari(false)
+  }
   const { theme, toggleTheme, fs, toggleFs, showFilter, setShowFilter } = useUi()
   const ThemeIcon = theme === 'dark' ? Sun : Moon
   const [navFs, setNavFs] = useState(false) // di layar penuh sidebar jadi laci yang menimpa tabel, tertutup sampai hamburger diklik
@@ -63,11 +71,11 @@ export default function Shell({ user, onLogout }) {
           {notice && <div className="banner info">{notice}<button onClick={clearNotice} title="Tutup">×</button></div>}
           {loading ? <div className="empty">Memuat data...</div> : (
             <>
-              {page === 'monitoring' && <Monitoring by={user.username} />}
+              {page === 'monitoring' && <Monitoring key={navKey} by={user.username} />}
               {page === 'upload' && <UploadExcel by={user.username} />}
               {page === 'delete' && <DeleteData by={user.username} />}
               {page === 'log' && <Riwayat />}
-              {page === 'cadangan' && <Cadangan />}
+              {page === 'cadangan' && <Cadangan key={navKey} />}
             </>
           )}
         </main>

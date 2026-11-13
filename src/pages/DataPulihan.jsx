@@ -69,7 +69,7 @@ export default function DataPulihan({ embedded = false }) {
     <>
       {!embedded && <div className="toolbar"><h2 style={{ margin: 0 }}>Data Pulihan</h2></div>}
       <p className="hint">File yang bisa dipulihkan. Cadangan dibuat otomatis sebelum container diganti, dihapus, atau digabung. Pindahkan ke Monitoring untuk memakainya lagi.</p>
-      <FilterBar fields={GROUP_FIELDS} value={f} onChange={(v) => { setF(v); setMsg(null) }} onClear={() => setF(G0)} />
+      <FilterBar fields={GROUP_FIELDS} scope="Container, Buyer, Packing List" value={f} onChange={(v) => { setF(v); setMsg(null) }} onClear={() => setF(G0)} />
       <div className="count">{shown.length} file pulihan</div>
       {msg && <div className={'msg ' + msg.type}>{msg.text}</div>}
       {!shown.length ? <div className="empty">{list.length ? 'Tidak ada file yang cocok.' : 'Belum ada file pulihan. Cadangan muncul di sini otomatis setelah ada container yang diganti, dihapus, atau digabung.'}</div> : (

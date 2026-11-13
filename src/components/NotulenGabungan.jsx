@@ -5,6 +5,7 @@ import { useData } from '../context/DataContext.jsx'
 import { api } from '../api.js'
 import { dariTabel, tglID } from '../utils/notulen.js'
 import { buatDocx, NOTE_DEFAULT } from '../utils/makeDocx.js'
+import { jamWIB, tglWIB } from '../utils/waktu.js'
 import { susunGabungan, gantiPeserta, parseIsi, teksBaris, keWA } from '../utils/isiNotulen.js'
 import { tgl, jam } from '../utils/notulenUtil.js'
 import { today } from '../utils/date.js'
@@ -18,7 +19,7 @@ export default function NotulenGabungan({ groups, rows, onClose }) {
   const [step, setStep] = useState('pilih'), [pick, setPick] = useState(() => new Set()), [q, setQ] = useState('')
   const [info, setInfo] = useState({ nama: 'MEETING CUSTOM ORDER', tanggal: today(), ruang: '', mulai: '13:00', selesai: '15:00' })
   const [manual, setManual] = useState([]), [np, setNp] = useState({ n: '', d: '' }), [absen, setAbsen] = useState([]), [busy, setBusy] = useState(false), [err, setErr] = useState('')
-  const [isi, setIsi] = useState(null), [copied, setCopied] = useState(false)
+  const [isi, setIsi] = useState(null), [copied, setCopied] = useState(false), [urut, setUrut] = useState(true) // urut: yang sudah dicentang di atas, urut centang pertama
 
   useEffect(() => { const k = (e) => e.key === 'Escape' && onClose(); window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [])
   const info0 = useMemo(() => new Map(groups.map((g) => [g.id, dariTabel(rows.filter((r) => r.groupId === g.id))])), [groups, rows]) // catatan per container
@@ -26,14 +27,17 @@ export default function NotulenGabungan({ groups, rows, onClose }) {
   const terpilih = groups.filter((g) => pick.has(g.id))
   const toggle = (id) => setPick((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-  const ambilAbsen = async (gs) => { // peserta terkonfirmasi dari semua container terpilih
+  const ambilAbsen = async (gs) => { // peserta terkonfirmasi: absensi meeting (satu untuk semua container) + absensi lama per container
+    const gm = await api('/api/absen?current=1', { token }).catch(() => null), m = gm?.meeting
+    if (m && (m.status === 'berjalan' || tglWIB(m.startedAt) === today())) setInfo((i) => ({ ...i, tanggal: tglWIB(m.startedAt), mulai: jamWIB(m.startedAt), ...(m.endedAt ? { selesai: jamWIB(m.endedAt) } : {}) })) // jam dari tombol Meeting dimulai / ditutup
+    const global = (gm?.log || []).filter((l) => l.confirmed).map((l) => `${l.nama} ( ${l.bagian} )`)
     const hasil = await Promise.all(gs.map((g) => api('/api/absen?groupId=' + encodeURIComponent(g.id), { token }).then((x) => (x.log || []).filter((l) => l.confirmed).map((l) => `${l.nama} ( ${l.bagian} )`)).catch(() => [])))
-    return hasil.flat()
+    return [...global, ...hasil.flat()]
   }
   const hadirDari = (a, m) => { const u = new Map(); [...a, ...m.map((p) => `${p.n} ( ${p.d} )`)].forEach((x) => { if (!u.has(x.toLowerCase())) u.set(x.toLowerCase(), x) }); return [...u.values()] } // tanpa dobel; penulisan pertama dipakai
   const hadir = hadirDari(absen, manual)
   const sections = terpilih.map((g) => ({ heading: [`${g.container}${g.buyer ? ' ' + g.buyer : ''}`.trim(), g.shipDate ? 'RENCANA KIRIM ' + tglID(g.shipDate).toUpperCase() : 'RENCANA KIRIM'].join(' '), items: info0.get(g.id).items }))
-  const auto = susunGabungan({ judul: 'NOTULEN ' + info.nama.toUpperCase(), hari: tgl(info.tanggal), tempat: 'Ruang Meeting ' + (info.ruang || '-'), jam: `${jam(info.mulai)} WIB s/d ${jam(info.selesai)}`, hadir, sections, rincian: terpilih.flatMap((g) => info0.get(g.id).rincian.map((r) => ({ ...r, container: g.container }))), note: NOTE_DEFAULT })
+  const auto = susunGabungan({ judul: 'NOTULEN ' + info.nama.toUpperCase(), hari: tgl(info.tanggal), tempat: 'Ruang Meeting ' + (info.ruang || '-'), jam: `${jam(info.mulai)} WIB s/d ${jam(info.selesai)}`, hadir, sections, selesaiDiAtas: urut, rincian: terpilih.flatMap((g) => info0.get(g.id).rincian.map((r) => ({ ...r, container: g.container }))), note: NOTE_DEFAULT })
   const text = isi ?? auto
   const done = new Set(terpilih.flatMap((g) => teksBaris(info0.get(g.id).items.filter((i) => i.selesai))))
   const nCatatan = terpilih.reduce((n, g) => n + info0.get(g.id).items.length, 0)
@@ -64,7 +68,7 @@ export default function NotulenGabungan({ groups, rows, onClose }) {
             <input placeholder="Cari container / buyer…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari container" />
             <span className="hint">{pick.size} dipilih · {nCatatan} catatan</span>
           </div>
-          <div className="tablewrap" style={{ maxHeight: 260 }}>
+          <div className="tablewrap">
             <table className="grid"><thead><tr><th /><th>Container</th><th>Buyer</th><th>Ship Date</th><th>Catatan</th></tr></thead>
               <tbody>{daftar.map((g) => <tr key={g.id} onClick={() => toggle(g.id)} style={{ cursor: 'pointer' }}>
                 <td><input type="checkbox" className="chk" checked={pick.has(g.id)} onChange={() => toggle(g.id)} onClick={(e) => e.stopPropagation()} aria-label={'Pilih ' + g.container} /></td>
@@ -83,6 +87,7 @@ export default function NotulenGabungan({ groups, rows, onClose }) {
         {step === 'preview' && <>
           <div className="toolbar wrap">
             <button className="btn" onClick={() => setStep('pilih')}><ArrowLeft size={15} /> Ubah pilihan</button>
+            <label className="swlabel" title="Yang sudah dicentang (tag packing) ditaruh sesuai urutan dicentang: yang pertama dicentang paling atas"><input type="checkbox" checked={urut} onChange={(e) => { setUrut(e.target.checked); setIsi(null) }} /> Yang dicentang di paling atas (urut centang)</label>
             <span className="hint">{terpilih.length} container · {nCatatan} catatan · {hadir.length} peserta terkonfirmasi. Seluruh halaman bisa diedit langsung.</span>
           </div>
           <div className="paper print-area"><HalamanNotulen text={text} done={done} onText={setIsi} onPeserta={pesertaBaru} onSusun={susunUlang} canSusun={isi !== null} /></div>

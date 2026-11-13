@@ -16,7 +16,7 @@ export default function AbsenRoom({ id }) {
   const [nama, setNama] = useState(''), [bagian, setBagian] = useState(''), [busy, setBusy] = useState(false), [ok, setOk] = useState(null)
   const kunci = 'absen_entry_' + id
   const [entry, setEntry] = useState(() => { try { return localStorage.getItem(kunci) || '' } catch { return '' } }) // id absen saya (diingat di HP ini)
-  const apply = (x) => { setD({ room: x.room, log: x.log, mine: x.mine, live: x.live }); setOffset(Date.parse(x.now) - Date.now()) }
+  const apply = (x) => { setD({ room: x.room, log: x.log, mine: x.mine, live: x.live, liveKind: x.liveKind }); setOffset(Date.parse(x.now) - Date.now()) }
   useEffect(() => {
     let on = true
     const load = () => call('/api/absen?room=' + encodeURIComponent(id) + (entry ? '&entry=' + encodeURIComponent(entry) : '')).then((x) => { if (on) { apply(x); setErr('') } }).catch((e) => { if (on && e.status === 404) setD(false); else if (on) setErr(e.message) })
@@ -47,7 +47,7 @@ export default function AbsenRoom({ id }) {
         {err && <div className="msg err">{err}</div>}
         {ok && <div className="msg okmsg" role="status"><CheckCircle2 size={18} /> {ok.dup ? 'Anda sudah tercatat' : 'Absen tercatat'}: <b>{ok.nama} ( {ok.bagian} )</b> pukul <b>{jamStr(ok.at)} WIB</b></div>}
         {d.mine && (d.mine.confirmed
-          ? <div className="msg okmsg" role="status"><CheckCircle2 size={18} /> Absen Anda sudah <b>dikonfirmasi admin</b>.{d.live && <> <a className="btn primary big" style={{ display: 'flex', marginTop: 10 }} href={'/?live=' + d.live}><Radio size={18} /> Lihat live</a></>}</div>
+          ? <div className="msg okmsg" role="status"><CheckCircle2 size={18} /> Absen Anda sudah <b>dikonfirmasi admin</b>.{d.live && <> <a className="btn primary big" style={{ display: 'flex', marginTop: 10 }} href={(d.liveKind === 'meeting' ? '/?meeting=' : '/?live=') + d.live}><Radio size={18} /> Lihat live</a></>}</div>
           : <div className="msg" role="status" style={{ background: '#fef3c7', color: '#92400e', borderRadius: 10, padding: '10px 12px' }}><Hourglass size={16} /> Menunggu konfirmasi admin… tombol <b>Lihat live</b> muncul di sini setelah dikonfirmasi (halaman ini ter-update otomatis).</div>)}
         <div className="card"><h4 style={{ margin: '0 0 8px' }}>Log absensi ({d.log.length})</h4>
           <div className="tw"><table className="logtbl"><thead><tr><th>#</th><th>Nama</th><th>Bagian</th><th>Waktu</th><th></th></tr></thead>

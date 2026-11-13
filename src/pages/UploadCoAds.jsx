@@ -123,7 +123,7 @@ export default function UploadCoAds({ by }) {
               <h3 style={{ marginTop: 0 }}>Pratinjau sheet {s.sheet} <small>{s.rows.length} baris{s.rows.length > BATAS_PRATINJAU ? `, ${BATAS_PRATINJAU} pertama` : ''}</small></h3>
               {s.warnings.length > 0 && <div className="msg warn"><b>Perlu dicek:</b>{s.warnings.slice(0, 8).map((w, i) => <div key={i}>{w}</div>)}{s.warnings.length > 8 && <div>+{s.warnings.length - 8} peringatan lain</div>}</div>}
               {s.catatan.length > 0 && <div className="hint">Catatan di file (tidak diimpor): {s.catatan.join(' | ')}</div>}
-              <div className="tablewrap" style={{ maxHeight: 420 }}>
+              <div className="tablewrap">
                 <table className="grid">
                   <thead><tr>{CO_ADS_COLS.map((c) => <th key={c.key}>{c.label}</th>)}</tr></thead>
                   <tbody>{s.rows.slice(0, BATAS_PRATINJAU).map((r, i) => <tr key={i}>{CO_ADS_COLS.map((c) => <td key={c.key}>{r[c.key] ?? ''}</td>)}</tr>)}</tbody>
