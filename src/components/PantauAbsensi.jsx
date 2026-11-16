@@ -4,6 +4,7 @@ import BagikanLink from './BagikanLink.jsx'
 import JamMerah, { jamStr } from './JamMerah.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { useMeeting } from '../context/useMeeting.js'
+import Bantuan from './Bantuan.jsx'
 import { jamWIB } from '../utils/waktu.js'
 
 // Absensi & Meeting: SATU absensi untuk seluruh container (peserta cukup absen sekali), tombol Meeting dimulai / Meeting ditutup,
@@ -39,7 +40,6 @@ export function PanelMeeting({ mt, defaultNama = 'MEETING CUSTOM ORDER' }) {
               <button className="btn primary" disabled={busy} onClick={mulai}><Play size={15} /> Meeting dimulai</button>
             </div>
           )}
-          <p className="hint">{jalan ? 'Peserta cukup absen satu kali lewat QR di bawah, tidak perlu absen lagi saat pindah container.' : 'Klik Meeting dimulai untuk membuka absensi (satu QR untuk semua container). Jam mulai dan selesai otomatis masuk ke notulen.'}</p>
         </div>}
 
         {room && <div className="ntsec"><h4>Absensi</h4>
@@ -54,7 +54,7 @@ export function PanelMeeting({ mt, defaultNama = 'MEETING CUSTOM ORDER' }) {
             <table className="grid">
               <thead><tr><th>#</th><th>Nama</th><th>Bagian</th><th>Waktu</th><th>Status</th><th>Aksi</th></tr></thead>
               <tbody>
-                {!log.length && <tr><td colSpan="6" className="hint">Belum ada yang absen. Bagikan QR / link di atas.</td></tr>}
+                {!log.length && <tr><td colSpan="6" className="hint">Belum ada yang absen.</td></tr>}
                 {log.map((l, i) => (
                   <tr key={l.id}><td>{i + 1}</td><td>{l.nama}</td><td>{l.bagian}</td><td>{jamStr(l.at)}</td>
                     <td>{l.confirmed ? <span className="chip-st buka" style={{ margin: 0 }}>Terkonfirmasi</span> : <span className="chip-st" style={{ margin: 0, background: '#fef3c7', color: '#92400e' }}>Menunggu</span>}</td>
@@ -66,11 +66,9 @@ export function PanelMeeting({ mt, defaultNama = 'MEETING CUSTOM ORDER' }) {
               </tbody>
             </table>
           </div>
-          <p className="hint">Hanya peserta yang sudah dikonfirmasi masuk ke notulen. Setelah dikonfirmasi, di HP peserta muncul tombol <b>Lihat live</b> (live meeting).</p>
         </div>}
 
         <div className="ntsec"><h4><Radio size={14} style={{ verticalAlign: '-2px' }} /> Link live meeting</h4>
-          <p className="hint">Satu link untuk semua container: tampilan live <b>otomatis berpindah</b> ke container yang sedang Anda buka di halaman Input. Hanya melihat, tanpa login.</p>
           {lv === null && <div className="empty">Memuat…</div>}
           {lv === false && <div className="msg err">Gagal membuat link live meeting. Coba lagi.</div>}
           {lv && <>
@@ -91,7 +89,7 @@ export default function PantauAbsensi({ onClose }) {
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal pantau wide" role="dialog" aria-modal="true" aria-label="Absensi dan meeting" onClick={(e) => e.stopPropagation()}>
-        <div className="toolbar"><h3 style={{ margin: 0 }}><QrCode size={18} style={{ verticalAlign: '-3px' }} /> Absensi &amp; Meeting <small>satu absensi untuk semua container</small></h3><span className="spacer" /><button className="icon-btn" aria-label="Tutup" onClick={onClose}><X size={18} /></button></div>
+        <div className="toolbar"><h3 style={{ margin: 0 }}><QrCode size={18} style={{ verticalAlign: '-3px' }} /> Absensi &amp; Meeting <small>satu absensi untuk semua container</small><Bantuan topik="absensi" /></h3><span className="spacer" /><button className="icon-btn" aria-label="Tutup" onClick={onClose}><X size={18} /></button></div>
         <PanelMeeting mt={mt} />
       </div>
     </div>

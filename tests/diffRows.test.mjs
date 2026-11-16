@@ -93,3 +93,9 @@ test('pencarian satu kotak: semua kata harus cocok, lintas kolom dan container',
   assert.deepEqual(filterRows(rows, { q: '10' }, groups).map((r) => r.id), ['a', 'b'])
   assert.deepEqual(filterGroups([{ container: 'AF-28', buyer: 'AAW' }, { container: 'BX', buyer: 'ZZZ' }], { q: 'aaw' }).map((g) => g.container), ['AF-28'])
 })
+
+import { showDate } from '../src/utils/date.js'
+test('showDate: tanggal biasa, waktu ISO, dan nilai kosong tidak membuat error', () => {
+  assert.equal(showDate('2026-11-10'), '10/11/2026'); assert.equal(showDate('2026-11-10T03:10:00.000Z'), '10/11/2026')
+  assert.equal(showDate(undefined), '-'); assert.equal(showDate(''), '-')
+})

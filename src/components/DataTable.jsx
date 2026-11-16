@@ -73,6 +73,13 @@ export default function DataTable({ rows, cols: baseCols, editable = [], editing
   const cmp = sort && ((a, b) => String(calc(a, sort.key)).localeCompare(String(calc(b, sort.key)), 'id', { numeric: true }) * sort.dir)
   const vis = [...bySo.values()].flatMap((g) => (cmp ? [...g].sort(cmp) : g))
   const segs = []; for (const [so, g] of bySo) { const st = segs.length ? segs.at(-1).end : 0; segs.push({ so, start: st, end: st + g.length }) }
+  // Semua hook di atas baris return awal di bawah: jumlah hook harus sama di setiap render, termasuk saat hasil pencarian kosong.
+  useEffect(() => { // posisi kursor / sel yang sedang diketik dilaporkan (dipakai tampilan live untuk menunjukkan kursor admin)
+    if (!onCursor) return
+    const ok = !!sel && sel.a[0] < vis.length && sel.b[0] < vis.length
+    const r = ok && vis[Math.min(sel.a[0], sel.b[0])], c = ok && cols[Math.min(sel.a[1], sel.b[1])]
+    onCursor(r && c ? { rowId: r.id, key: c.key, editing: !!ed } : null)
+  }, [sel?.a?.[0], sel?.a?.[1], sel?.b?.[0], sel?.b?.[1], vis.length, ed?.id, ed?.key])
   if (!rows.length) return <div className="empty">Tidak ada data yang cocok.</div>
 
   const selOk = !!sel && sel.a[0] < vis.length && sel.b[0] < vis.length   // seleksi yang sudah di luar baris (filter berubah / baris dihapus) dianggap tidak ada
@@ -239,11 +246,6 @@ export default function DataTable({ rows, cols: baseCols, editable = [], editing
   const nLate = un.filter((r) => tgt(r) && tgt(r) < todayS && !kirimOf(r)).length, nToday = un.filter((r) => tgt(r) === todayS).length
   const nNoArea = un.filter((r) => !String(calc(r, 'area') ?? '').trim()).length
   const perArea = Object.entries(un.reduce((m, r) => { const a = String(calc(r, 'area') ?? '').trim().toUpperCase(); if (a) m[a] = (m[a] || 0) + 1; return m }, {})).sort((a, b) => b[1] - a[1])
-  useEffect(() => { // posisi kursor / sel yang sedang diketik dilaporkan (dipakai tampilan live untuk menunjukkan kursor admin)
-    if (!onCursor) return
-    const r = rg && vis[rg.r0], c = rg && cols[rg.c0]
-    onCursor(r && c ? { rowId: r.id, key: c.key, editing: !!ed } : null)
-  }, [rg?.r0, rg?.c0, ed?.id, ed?.key])
   const bukaRh = async () => { if (!rg || !vis[rg.r0] || !cols[rg.c0]) return; const row = vis[rg.r0], col = cols[rg.c0]; setRh({ row, col, list: null }); setRh({ row, col, list: await cellHistory(row.id, col.key) }) }
   const kembalikan = async (e) => { if (!(await confirm({ title: 'Kembalikan nilai sel?', message: `Sel ${rh.col.label} diubah kembali menjadi "${show(rh.col, e.old) || '(kosong)'}".`, confirmLabel: 'Kembalikan' }))) return; await applyChanges({ [rh.row.id]: { [rh.col.key]: e.old } }); setRh(null) }
   const B = ({ t, d, f, children, cls = 'icon-btn dark' }) => <button className={cls} disabled={d} title={t} onClick={f}>{children}</button>
@@ -401,7 +403,7 @@ export default function DataTable({ rows, cols: baseCols, editable = [], editing
           </div>
         ))}
       </div>
-      <div className="statfoot" role="status" aria-live="polite">{pasteMsg ? <b>{pasteMsg}</b> : st && st.n > 0 ? <><span>{st.cells} sel dipilih</span><span>Terisi: {st.n}</span>{st.k > 0 && <><span>Jumlah: <b>{nf(st.sm)}</b></span><span>Rata-rata: <b>{nf(st.sm / st.k)}</b></span><span>Min: {nf(st.mn)}</span><span>Maks: {nf(st.mx)}</span></>}</> : <span>{editing ? 'Klik sel untuk memilih · klik 2x / F2 / ketik untuk mengisi · Enter / Tab simpan & pindah · Esc batal · bisa paste banyak sel dari Excel' : 'Pilih sel untuk melihat jumlah, rata-rata, dan lainnya.'}</span>}</div>
+      <div className="statfoot" role="status" aria-live="polite">{pasteMsg ? <b>{pasteMsg}</b> : st && st.n > 0 ? <><span>{st.cells} sel dipilih</span><span>Terisi: {st.n}</span>{st.k > 0 && <><span>Jumlah: <b>{nf(st.sm)}</b></span><span>Rata-rata: <b>{nf(st.sm / st.k)}</b></span><span>Min: {nf(st.mn)}</span><span>Maks: {nf(st.mx)}</span></>}</> : <span>{vis.length} baris · {segs.length} SO</span>}</div>
       {rh && <div className="overlay" onClick={() => setRh(null)}><div className="modal" role="dialog" aria-modal="true" aria-label="Riwayat sel" style={{ width: 'min(560px,94vw)' }} onClick={(e) => e.stopPropagation()}>
         <div className="toolbar"><h3 style={{ margin: 0 }}>Riwayat sel · {rh.col.label}</h3><span className="spacer" /><button className="icon-btn" aria-label="Tutup" onClick={() => setRh(null)}><X size={18} /></button></div>
         <p className="hint">SO {rh.row.so || '-'} · PO {rh.row.po || '-'} · {rh.row.productName}</p>

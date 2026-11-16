@@ -4,6 +4,7 @@ import InfoCard from '../components/InfoCard.jsx'
 import FilterBar, { GROUP_FIELDS } from '../components/FilterBar.jsx'
 import { filterGroups } from '../utils/filter.js'
 import { useFill } from '../utils/useFill.js'
+import Bantuan from '../components/Bantuan.jsx'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { bangunExcelSemua, unduhBlob, stamp } from '../utils/exportAll.js'
@@ -47,7 +48,7 @@ export default function Cadangan() {
 
   return (
     <>
-      <h2>Cadangan Data</h2>
+      <h2>Cadangan Data<Bantuan topik="cadangan" /></h2>
       <div className="montabs" role="tablist" aria-label="Jenis cadangan">
         <button role="tab" aria-selected={tab === 'container'} className={tab === 'container' ? 'on' : ''} onClick={() => setTab('container')}><RotateCcw size={15} /> Per container <i>{kelompok.length}</i></button>
         <button role="tab" aria-selected={tab === 'penuh'} className={tab === 'penuh' ? 'on' : ''} onClick={() => setTab('penuh')}><ShieldCheck size={15} /> Cadangan penuh <i>{snapshots?.length || 0}</i></button>
@@ -56,7 +57,6 @@ export default function Cadangan() {
       {msg && <div className={'msg ' + msg.type}>{msg.text}</div>}
 
       {tab === 'container' && <>
-        <p className="hint">Dibuat otomatis sebelum satu container diganti, dihapus, atau digabung (8 terakhir per container). Memulihkan tidak membuang cadangan, dan isi container yang sedang tampil dicadangkan dulu.</p>
         <FilterBar fields={GROUP_FIELDS} scope="Container, Buyer, Packing List" value={f} onChange={setF} onClear={() => setF({ container: '', buyer: '', q: '' })} />
         {!tampil.length ? <div className="empty">{kelompok.length ? 'Tidak ada container yang cocok.' : 'Belum ada cadangan container.'}</div> : (
           <div className="tablewrap">
@@ -83,7 +83,6 @@ export default function Cadangan() {
       </>}
 
       {tab === 'penuh' && <>
-        <p className="hint">Cadangan SEMUA container sekaligus. Dibuat otomatis tiap hari (sebelum pembersihan data lama) dan sebelum pemulihan; 14 terakhir disimpan. Untuk memulihkan satu container saja, pakai tab Per container.</p>
         <div className="toolbar wrap"><button className="btn" disabled={!!busy} onClick={buat}><Archive size={15} /> Buat cadangan sekarang</button></div>
         {!snapshots?.length ? <div className="empty">Belum ada cadangan. Cadangan pertama dibuat otomatis saat pembersihan harian berjalan, atau klik tombol di atas.</div> : (
           <div className="tablewrap">
@@ -106,7 +105,7 @@ export default function Cadangan() {
       {tab === 'unduh' && (
         <div className="panel wide">
           <h3 style={{ marginTop: 0 }}>Unduh semua data</h3>
-          <p className="hint">{groups.length} container · {rows.length} baris saat ini. Unduh berkala dan simpan di tempat lain (Google Drive, flashdisk) agar data tidak hanya bergantung pada satu database.</p>
+          <p className="hint">{groups.length} container · {rows.length} baris saat ini.</p>
           <div className="toolbar wrap">
             <button className="btn primary" disabled={!groups.length || !!busy} onClick={unduhExcel}><FileSpreadsheet size={15} /> {busy === 'xlsx' ? 'Menyusun…' : 'Unduh Excel (semua container)'}</button>
             <button className="btn" disabled={!groups.length || !!busy} onClick={unduhJson}><FileJson size={15} /> Unduh cadangan (.json)</button>

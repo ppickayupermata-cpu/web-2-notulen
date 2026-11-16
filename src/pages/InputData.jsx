@@ -7,6 +7,7 @@ import { useData } from '../context/DataContext.jsx'
 import { filterGroups, filterRows } from '../utils/filter.js'
 import { colsFor, isCoAds } from '../config.js'
 import { useFill } from '../utils/useFill.js'
+import Bantuan from '../components/Bantuan.jsx'
 import { PackageCheck } from 'lucide-react'
 import { infoPindahSo } from '../utils/barangJadi.js'
 import Notulen from '../components/Notulen.jsx'
@@ -111,7 +112,7 @@ export default function InputData({ groupId, onBack }) {
       <div className="fillpage">
         <div className="toolbar wrap">
           <button className="btn" onClick={back}><ArrowLeft size={15} /> Kembali</button>
-          <h2 style={{ margin: 0 }}>Input Data · Container {open.container} <small>Buyer {open.buyer || '-'}</small></h2>
+          <h2 style={{ margin: 0 }}>Input Data · Container {open.container} <small>Buyer {open.buyer || '-'}</small><Bantuan topik="input" /></h2>
           <span className="spacer" />
           <button className="btn" onClick={undo} disabled={!history.length}><Undo2 size={15} /> Undo</button>
           <button className="btn primary" onClick={submit} disabled={!changed}><Save size={15} /> Submit ({changed})</button>
@@ -130,7 +131,7 @@ export default function InputData({ groupId, onBack }) {
   const shown = filterGroups(groups, f)
   return (
     <>
-      <h2>Input Data</h2>
+      <h2>Input Data<Bantuan topik="input" /></h2>
       <FilterBar fields={GROUP_FIELDS} scope="Container, Buyer, Packing List" value={f} onChange={setF} onClear={() => setF(G0)} />
       <div className="count">{shown.length} packing list {msg && <span className="msg ok"> · {msg}</span>}</div>
       <GroupList

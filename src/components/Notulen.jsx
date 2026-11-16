@@ -3,6 +3,7 @@ import { X, Download, UserPlus, NotebookPen, QrCode, Trash2, Copy, Lock, Unlock,
 import HalamanNotulen from './HalamanNotulen.jsx'
 import { useMeeting } from '../context/useMeeting.js'
 import { PanelMeeting } from './PantauAbsensi.jsx'
+import Bantuan from './Bantuan.jsx'
 import { jamWIB, tglWIB } from '../utils/waktu.js'
 import { dariTabel, tglID } from '../utils/notulen.js'
 import { buatDocx, NOTE_DEFAULT } from '../utils/makeDocx.js'
@@ -72,7 +73,7 @@ export default function Notulen({ group, rows, calc, onClose }) {
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal wide" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <div className="mh"><NotebookPen size={20} /><h3>Catat Notulen · Container {group.container}</h3><button className="icon-btn" onClick={onClose} title="Tutup (Esc)"><X size={18} /></button></div>
+        <div className="mh"><NotebookPen size={20} /><h3>Catat Notulen · Container {group.container}<Bantuan topik="notulen" /></h3><button className="icon-btn" onClick={onClose} title="Tutup (Esc)"><X size={18} /></button></div>
         <div className="ntsec"><h4>Meeting</h4>
           <div className="nt">
             <label>Nama meeting<input value={info.nama} onChange={set('nama')} /></label><label>Tanggal<input type="date" value={info.tanggal} onChange={set('tanggal')} /></label>
@@ -85,7 +86,7 @@ export default function Notulen({ group, rows, calc, onClose }) {
             <div className="chips">{manual.map((p, i) => <button key={i} className={'chip' + (p.hadir ? ' on' : '')} onClick={() => setManual(manual.map((x, j) => (j === i ? { ...x, hadir: !x.hadir } : x)))}>{lbl(p)}</button>)}</div>
             <div className="toolbar"><input placeholder="Nama" value={np.n} onChange={(e) => setNp({ ...np, n: e.target.value })} /><input placeholder="Bagian (PROD)" size="10" value={np.d} onChange={(e) => setNp({ ...np, d: e.target.value })} /><button className="btn sm" onClick={tambah}><UserPlus size={14} /> Tambah</button></div></details></div>
         <div className="ntsec"><h4>Notulen dari Excel yang diupload</h4>
-          <p className="hint">{tabel.baris} baris tabel diringkas menjadi {tabel.items.length} catatan ({tabel.po} PO), tiap SO satu blok dengan jarak antar SO. Kesamaan AREA dan TARGET SELESAI dalam satu PO dicatat sekali.{tabel.selesai ? ` ${tabel.selesai} catatan sudah dipacking ditaruh paling bawah (warna hijau).` : ''}{tabel.kosong ? ` ${tabel.kosong} baris belum diisi AREA / TARGET / KETERANGAN dan dilewati.` : ''} Seluruh halaman di bawah (judul, keterangan, peserta, catatan, NOTE) bisa diedit langsung; hasil unduhan Word mengikuti teks ini. Mengubah data meeting di atas hanya otomatis menyusun halaman selama belum Anda ketik sendiri.</p>
+          <p className="hint">{tabel.baris} baris tabel → {tabel.items.length} catatan ({tabel.po} PO){tabel.selesai ? ` · ${tabel.selesai} sudah dipacking` : ''}{tabel.kosong ? ` · ${tabel.kosong} baris belum diisi (dilewati)` : ''}</p>
           <div className="toolbar wrap"><label className="swlabel" title="Yang sudah dicentang (tag packing) ditaruh sesuai urutan dicentang: yang pertama dicentang paling atas, berikutnya di bawahnya"><input type="checkbox" checked={urut} onChange={(e) => { setUrut(e.target.checked); setIsi(null) }} /> Yang sudah dicentang di paling atas, urut sesuai centang pertama</label><span className="hint">Mengubah ini menyusun ulang halaman dari tabel.</span></div>
           <div className="paper print-area"><HalamanNotulen text={text} done={done} onText={setIsi} onPeserta={pesertaBaru} onSusun={susunUlang} canSusun={isi !== null} /></div>
           <div className="toolbar wrap">

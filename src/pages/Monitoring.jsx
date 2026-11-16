@@ -10,6 +10,7 @@ import { PencilLine, ArrowLeft, Radio, Trash2, QrCode, Share2, Merge, ArrowRight
 import { colsFor, isCoAds } from '../config.js'
 import DataPulihan from './DataPulihan.jsx'
 import BarangJadi from './BarangJadi.jsx'
+import Bantuan from '../components/Bantuan.jsx'
 import { useFill } from '../utils/useFill.js'
 import NotulenGabungan from '../components/NotulenGabungan.jsx'
 import PantauAbsensi from '../components/PantauAbsensi.jsx'
@@ -66,7 +67,7 @@ export default function Monitoring({ by }) {
       <>
         <div className="toolbar">
           <button className="btn" onClick={() => { setOpenId(null); setFi(I0) }}><ArrowLeft size={15} /> Kembali</button>
-          <h2 style={{ margin: 0 }}>Container {open.container} <small>Buyer {open.buyer || '-'}</small></h2>
+          <h2 style={{ margin: 0 }}>Container {open.container} <small>Buyer {open.buyer || '-'}</small><Bantuan topik="live" /></h2>
           <span className="live-badge"><Radio size={14} /> LIVE</span><span className="spacer" />
           <button className="btn" onClick={() => setLd(open)}><Share2 size={15} /> Bagikan link live</button>
         </div>
@@ -91,18 +92,18 @@ export default function Monitoring({ by }) {
       <button role="tab" aria-selected={tab === 'barang'} className={tab === 'barang' ? 'on' : ''} onClick={() => setTab('barang')}><PackageCheck size={15} /> Barang Jadi <i>{finished?.length || 0}</i></button>
     </div>
   )
-  if (tab === 'barang') return <><div className="toolbar"><h2 style={{ margin: 0 }}>Monitoring</h2></div>{tabs}<BarangJadi /></>
-  if (tab === 'pulih') return <><div className="toolbar"><h2 style={{ margin: 0 }}>Monitoring</h2></div>{tabs}<DataPulihan embedded /></>
+  if (tab === 'barang') return <><div className="toolbar"><h2 style={{ margin: 0 }}>Monitoring<Bantuan topik="barangjadi" /></h2></div>{tabs}<BarangJadi /></>
+  if (tab === 'pulih') return <><div className="toolbar"><h2 style={{ margin: 0 }}>Monitoring<Bantuan topik="terpulihkan" /></h2></div>{tabs}<DataPulihan embedded /></>
   return (
     <>
-      <div className="toolbar"><h2 style={{ margin: 0 }}>Monitoring</h2><span className="spacer" /><button className="btn" onClick={() => setPa(true)} title="Absensi satu kali untuk semua container, Meeting dimulai / ditutup, dan link live meeting"><QrCode size={15} /> Absensi &amp; Meeting</button>
+      <div className="toolbar"><h2 style={{ margin: 0 }}>Monitoring<Bantuan topik="monitoring" /></h2><span className="spacer" /><button className="btn" onClick={() => setPa(true)} title="Absensi satu kali untuk semua container, Meeting dimulai / ditutup, dan link live meeting"><QrCode size={15} /> Absensi &amp; Meeting</button>
       <button className="btn" disabled={!groups.length} onClick={() => setNg(true)} title="Gabungkan notulen beberapa container menjadi satu (semua atau custom select)"><Merge size={15} /> Gabungkan notulen</button></div>
       {tabs}
       <FilterBar fields={GROUP_FIELDS} scope="Container, Buyer, Packing List" value={f} onChange={(v) => { setF(v); setMsg('') }} onClear={() => setF(G0)} />
       <div className="count">{shown.length} packing list{tab === 'coads' ? ' CO ADS' : ''} {msg && <span className="msg ok"> · {msg}</span>}</div>
       <GroupList
         groups={shown} rows={rows} canEdit={canDelete} onSave={updateGroup}
-        empty={tab === 'coads' && !nCo ? 'Belum ada packing list CO ADS. Upload lewat menu Upload Excel, pilih Upload CO ADS.' : groups.length ? 'Tidak ada packing list yang cocok.' : 'Belum ada data. Upload file Excel di menu Upload Excel.'}
+        empty={tab === 'coads' && !nCo ? 'Belum ada packing list CO ADS.' : groups.length ? 'Tidak ada packing list yang cocok.' : 'Belum ada data.'}
         actions={(g) => (
           <>
             <button className="btn sm primary" onClick={() => setInputId(g.id)}><PencilLine size={14} /> Input</button>

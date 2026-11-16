@@ -6,6 +6,7 @@ import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { INFO_COLS } from '../config.js'
 import UploadCoAds from './UploadCoAds.jsx'
+import Bantuan from '../components/Bantuan.jsx'
 
 const TAG = { baru: 'Baru', sama: 'Sudah ada', berubah: 'Berubah' }
 const KIND = { ganti: 'sebelum diganti', hapus: 'sebelum dihapus', gabung: 'sebelum digabung', pindah: 'sebelum dipindah ke Barang Jadi', 'sebelum-pulih': 'sebelum pemulihan' }
@@ -108,7 +109,7 @@ function UploadBiasa({ by }) {
   const h = parsed?.header
   return (
     <>
-      <h2>Upload Excel Packing List</h2>
+      <h2>Upload Excel Packing List<Bantuan topik="upload" /></h2>
       {!parsed && backups?.length > 0 && (
         <div className="msg warn"><b>Cadangan container di server</b> (dibuat otomatis sebelum data diganti, dihapus, atau digabung):
           {backups.slice(0, 6).map((b) => (
@@ -122,7 +123,6 @@ function UploadBiasa({ by }) {
           <UploadCloud size={22} /><span><b>Seret file Excel ke sini</b> atau klik untuk memilih (.xlsx, .xls, .csv)</span>
           <input key={fileKey} type="file" accept=".xlsx,.xls,.csv" onChange={onFile} />
         </label>
-        <p className="hint">Bagian atas file dibaca sebagai parent group: Container dan Buyer (juga Packing List No, Ship Date, Status). Kolom AREA sampai TANGGAL PENGIRIMAN di Excel tidak dibaca.</p>
         {msg && <div className={'msg ' + msg.type}>{msg.text}</div>}
         {parsed && (
           <>
@@ -130,7 +130,6 @@ function UploadBiasa({ by }) {
             {lain.length > 0 && <div className="msg warn">Perhatian, SO berikut juga ada di container lain: {lain.slice(0, 6).join('; ')}{lain.length > 6 ? ` (+${lain.length - 6} lainnya)` : ''}. Pastikan file ini diupload ke container yang benar.</div>}
             <details className="pemetaan" open={parsed.missing.length > 0 || parsed.tebak}>
               <summary><Columns3 size={14} /> Pemetaan kolom {parsed.tebak ? '(header ditebak, mohon periksa)' : ''}</summary>
-              <p className="hint">Tiap kolom Excel dipetakan ke kolom aplikasi. Pilih "Abaikan" untuk kolom yang tidak dipakai. Kolom wajib: SO dan Qty.</p>
               <div className="pgrid">{parsed.cols.map((c) => (
                 <label key={c.i}><span title={c.label}>{c.label}</span>
                   <select value={c.field} onChange={(e) => petakan(c.i, e.target.value)}>
@@ -169,7 +168,6 @@ function UploadBiasa({ by }) {
       </div>
       {parsed && target && custom && (
         <div className="panel wide">
-          <div className="toolbar wrap"><b>Pilih baris yang diterapkan</b><span className="hint">Baru = ditambahkan. Berubah / Sudah ada = hanya kolom identitas diperbarui; AREA, TARGET, KETERANGAN, TANGGAL PENGIRIMAN dan tag packing tetap.</span></div>
           <div className="toolbar wrap">
             <button className="btn sm" onClick={() => setPick(new Set(diff.map((_, i) => i)))}>Pilih semua</button>
             <button className="btn sm" onClick={() => setPick(barus())}>Hanya baru</button>
@@ -232,7 +230,7 @@ export default function UploadExcel({ by }) {
         <button role="tab" aria-selected={mode === 'coads'} className={mode === 'coads' ? 'on' : ''} onClick={() => setMode('coads')}>Upload CO ADS</button>
       </div>
       <div style={{ display: mode === 'biasa' ? 'block' : 'none' }}><UploadBiasa by={by} /></div>
-      <div style={{ display: mode === 'coads' ? 'block' : 'none' }}><h2>Upload CO ADS</h2><UploadCoAds by={by} /></div>
+      <div style={{ display: mode === 'coads' ? 'block' : 'none' }}><h2>Upload CO ADS<Bantuan topik="coads" /></h2><UploadCoAds by={by} /></div>
     </>
   )
 }

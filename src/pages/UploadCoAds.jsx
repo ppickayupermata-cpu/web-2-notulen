@@ -87,7 +87,6 @@ export default function UploadCoAds({ by }) {
           <UploadCloud size={22} /><span><b>Seret file DRAFT PL (CO ADS) ke sini</b> atau klik untuk memilih (.xlsx, .xls)</span>
           <input key={fileKey} type="file" accept=".xlsx,.xls" onChange={(e) => terima(e.target.files[0])} />
         </label>
-        <p className="hint">Hanya tabel packing list yang diambil: NO, DSA PO Number, KP SO Number, Product Description, Type, Size, Wood Species, Qty, UoM. Kop surat, baris Total, daftar PO di bawahnya, dan catatan tidak ikut. NO, PO, dan SO yang kosong di baris lanjutan diisi dari baris di atasnya. Tiap sheet menjadi satu container. AREA, TARGET SELESAI, KETERANGAN, dan TANGGAL PENGIRIMAN dimulai kosong.</p>
         {busy && !data && <div className="msg">Membaca file...</div>}
         {msg && <div className={'msg ' + msg.type}>{msg.text}</div>}
         {data?.kosong?.length > 0 && <div className="hint">Sheet tanpa tabel dilewati: {data.kosong.join(', ')}.</div>}

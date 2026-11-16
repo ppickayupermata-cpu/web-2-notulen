@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import Bantuan from './Bantuan.jsx'
 import { X, Download, Printer, ClipboardCheck, Copy, Merge, ArrowLeft, UserPlus, Wand2, CheckSquare, Square } from 'lucide-react'
 import HalamanNotulen from './HalamanNotulen.jsx'
 import { useData } from '../context/DataContext.jsx'
@@ -58,10 +59,9 @@ export default function NotulenGabungan({ groups, rows, onClose }) {
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal wide" role="dialog" aria-modal="true" aria-label="Gabungkan notulen" onClick={(e) => e.stopPropagation()}>
-        <div className="toolbar"><h3 style={{ margin: 0 }}><Merge size={18} style={{ verticalAlign: '-3px' }} /> Gabungkan notulen</h3><span className="spacer" /><button className="icon-btn" aria-label="Tutup" onClick={onClose}><X size={18} /></button></div>
+        <div className="toolbar"><h3 style={{ margin: 0 }}><Merge size={18} style={{ verticalAlign: '-3px' }} /> Gabungkan notulen<Bantuan topik="notulen" /></h3><span className="spacer" /><button className="icon-btn" aria-label="Tutup" onClick={onClose}><X size={18} /></button></div>
 
         {step === 'pilih' && <>
-          <p className="hint">Pilih container yang notulennya digabung. Hanya baris yang sudah diisi (AREA / TARGET / KETERANGAN) atau sudah dipacking yang masuk.</p>
           <div className="toolbar wrap">
             <button className="btn sm" onClick={() => setPick(new Set(groups.map((g) => g.id)))}><CheckSquare size={14} /> Pilih semua</button>
             <button className="btn sm" onClick={() => setPick(new Set())}><Square size={14} /> Kosongkan</button>
@@ -88,7 +88,7 @@ export default function NotulenGabungan({ groups, rows, onClose }) {
           <div className="toolbar wrap">
             <button className="btn" onClick={() => setStep('pilih')}><ArrowLeft size={15} /> Ubah pilihan</button>
             <label className="swlabel" title="Yang sudah dicentang (tag packing) ditaruh sesuai urutan dicentang: yang pertama dicentang paling atas"><input type="checkbox" checked={urut} onChange={(e) => { setUrut(e.target.checked); setIsi(null) }} /> Yang dicentang di paling atas (urut centang)</label>
-            <span className="hint">{terpilih.length} container · {nCatatan} catatan · {hadir.length} peserta terkonfirmasi. Seluruh halaman bisa diedit langsung.</span>
+            <span className="hint">{terpilih.length} container · {nCatatan} catatan · {hadir.length} peserta terkonfirmasi</span>
           </div>
           <div className="paper print-area"><HalamanNotulen text={text} done={done} onText={setIsi} onPeserta={pesertaBaru} onSusun={susunUlang} canSusun={isi !== null} /></div>
           <div className="toolbar wrap">

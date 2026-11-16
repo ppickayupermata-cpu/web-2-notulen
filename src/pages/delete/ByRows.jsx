@@ -57,7 +57,7 @@ export default function ByRows({ by }) {
         {msg && <span className={'msg ' + msg.type}>{msg.text}</span>}
       </div>
       {noFilter
-        ? <div className="empty">Ketik nomor SO, SO Item, atau Product Code, lalu centang baris yang mau dihapus.</div>
+        ? <div className="empty">Belum ada pencarian.</div>
         : <DataTable rows={shown} selectable selected={picked} onToggle={toggle} onToggleAll={toggleAll} />}
       {dialog}
     </>

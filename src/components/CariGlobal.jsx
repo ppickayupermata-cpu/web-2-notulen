@@ -67,7 +67,7 @@ export default function CariGlobal({ onClose, onPick }) {
       <div className="modal cari" role="dialog" aria-modal="true" aria-label="Cari di semua container" onClick={(e) => e.stopPropagation()}>
         <div className="cari-in"><Search size={18} /><input autoFocus placeholder="Cari di semua container: SO, PO, produk, AREA, container…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey} />{cari ? <Loader2 size={16} className="spin" aria-label="Mencari" /> : <kbd>Esc</kbd>}</div>
         <div className="cari-list" ref={box}>
-          {!q.trim() && <div className="empty">Pencarian menyeluruh: isi semua container, jadwal Hapus Data, Barang Jadi, dan Cadangan Data (hasilnya ditandai container-nya). Untuk mencari di satu container saja, pakai tombol Cari di dalam container itu.</div>}
+          {!q.trim() && <div className="empty">Ketik kata kunci untuk mulai mencari.</div>}
           {q.trim() && !datar.length && !cari && <div className="empty">Tidak ada yang cocok dengan “{q}”.</div>}
           {bagian.map((b) => (
             <div key={b.judul} role="group" aria-label={b.judul}>

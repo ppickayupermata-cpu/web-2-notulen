@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { useFill } from '../utils/useFill.js'
+import Bantuan from '../components/Bantuan.jsx'
 import { cocokTeks } from '../utils/filter.js'
 import FilterBar from '../components/FilterBar.jsx'
 
@@ -36,7 +37,7 @@ export default function Riwayat() {
 
   return (
     <>
-      <h2>Riwayat</h2>
+      <h2>Riwayat<Bantuan topik="riwayat" /></h2>
       <div className="toolbar wrap">
         <label className="inline">Tampilkan
           <select value={type} onChange={(e) => { setType(e.target.value); setMsg('') }}>
@@ -56,7 +57,7 @@ export default function Riwayat() {
         <span className="hint">{shown.length} catatan</span>
       </div>
       <FilterBar fields={[{ key: 'q', label: 'Cari catatan', placeholder: 'Container, pelaku, keterangan...' }]} value={f} onChange={setF} onClear={() => setF({ q: '' })} />
-      {!shown.length ? <div className="empty">{logs.length ? 'Tidak ada catatan yang cocok.' : 'Belum ada riwayat. Upload Excel akan tercatat di sini.'}</div> : (
+      {!shown.length ? <div className="empty">{logs.length ? 'Tidak ada catatan yang cocok.' : 'Belum ada riwayat.'}</div> : (
         <div className="tablewrap">
           <table className="grid">
             <thead><tr>

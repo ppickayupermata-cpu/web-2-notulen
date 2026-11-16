@@ -30,9 +30,6 @@ export default function Schedules({ by }) {
           <input type="number" min="1" max="12" style={{ minWidth: 0, width: 64 }} value={settings.months}
             onChange={(e) => setSettings({ months: Math.max(1, Math.min(12, Number(e.target.value) || 1)) })} /> bulan
         </label>
-        <p className="hint" style={{ margin: 0 }}>
-          Dijalankan otomatis oleh server setiap hari (dan saat ada yang membuka aplikasi). Container yang punya jadwal sendiri memakai tanggal jadwalnya.
-        </p>
         {overdue > 0 && <div className="msg err">{overdue} container sudah melewati batas dan akan terhapus pada pengecekan berikutnya.</div>}
       </div>
       <h3>Jadwal hapus</h3>

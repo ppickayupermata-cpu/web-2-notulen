@@ -20,7 +20,7 @@ export default function InfoCard({ type, id, onClose }) {
 
   let body = <div className="empty">{err || 'Memuat info...'}</div>
   if (d && type === 'backup') {
-    const r = ringkas(d.rows), g = d.group || {}, ada = groups.find((x) => x.container === d.container), nAda = ada ? now.filter((x) => x.groupId === ada.id).length : 0
+    const r = ringkas(d.rows || []), g = d.group || {}, ada = groups.find((x) => x.container === d.container), nAda = ada ? now.filter((x) => x.groupId === ada.id).length : 0
     const pct = (n) => (r.total ? `${n} dari ${r.total} baris (${Math.round((n / r.total) * 100)}%)` : '0')
     body = (
       <>

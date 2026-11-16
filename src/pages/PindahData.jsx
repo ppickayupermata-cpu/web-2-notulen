@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRightLeft } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { useFill } from '../utils/useFill.js'
+import Bantuan from '../components/Bantuan.jsx'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { bandingkan, rencanaPindah } from '../utils/diffRows.js'
 
@@ -50,9 +51,9 @@ export default function PindahData({ groupId, onBack }) {
     <>
       <div className="toolbar wrap">
         <button className="btn" onClick={onBack}><ArrowLeft size={15} /> Kembali</button>
-        <h2 style={{ margin: 0 }}>Pindah data lama <small>dari Container {asal.container}</small></h2>
+        <h2 style={{ margin: 0 }}>Pindah data lama <small>dari Container {asal.container}</small><Bantuan topik="pindahdata" /></h2>
       </div>
-      {!lain.length ? <div className="empty">Belum ada container lain sebagai tujuan. Upload file yang sama lalu pilih <b>Buat container baru</b>.</div> : (
+      {!lain.length ? <div className="empty">Belum ada container lain sebagai tujuan.</div> : (
         <>
           <div className="panel wide">
             <div className="toolbar wrap">
@@ -73,7 +74,6 @@ export default function PindahData({ groupId, onBack }) {
                 <ArrowRightLeft size={15} /> {busy ? 'Memproses...' : `Masukkan ${dipilih.length} baris ke data baru`}</button>
             </div>
             {msg && <div className={'msg ' + msg.type}>{msg.text}</div>}
-            <p className="hint">Baris dicocokkan lewat SO + SO Item. Sudah ada di tujuan = hanya isian (AREA, TARGET, KETERANGAN, TANGGAL PENGIRIMAN, tag packing) yang disalin ke kolom yang masih kosong. Belum ada = ditambahkan utuh dengan label OLD.</p>
           </div>
           <div className="tablewrap">
             <table className="grid">
