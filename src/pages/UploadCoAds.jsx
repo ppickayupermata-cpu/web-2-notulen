@@ -87,6 +87,7 @@ export default function UploadCoAds({ by }) {
           <UploadCloud size={22} /><span><b>Seret file DRAFT PL (CO ADS) ke sini</b> atau klik untuk memilih (.xlsx, .xls)</span>
           <input key={fileKey} type="file" accept=".xlsx,.xls" onChange={(e) => terima(e.target.files[0])} />
         </label>
+        <p className="hint">Hanya tabel packing list yang diambil: NO, DSA PO Number, KP SO Number, Product Description, Type, Size, Wood Species, Qty, UoM. Kop surat, baris Total, daftar PO di bawahnya, dan catatan tidak ikut. NO, PO, dan SO yang kosong di baris lanjutan diisi dari baris di atasnya. Tiap sheet menjadi satu container. AREA, TARGET SELESAI, KETERANGAN, dan TANGGAL PENGIRIMAN dimulai kosong.</p>
         {busy && !data && <div className="msg">Membaca file...</div>}
         {msg && <div className={'msg ' + msg.type}>{msg.text}</div>}
         {data?.kosong?.length > 0 && <div className="hint">Sheet tanpa tabel dilewati: {data.kosong.join(', ')}.</div>}
@@ -122,7 +123,7 @@ export default function UploadCoAds({ by }) {
               <h3 style={{ marginTop: 0 }}>Pratinjau sheet {s.sheet} <small>{s.rows.length} baris{s.rows.length > BATAS_PRATINJAU ? `, ${BATAS_PRATINJAU} pertama` : ''}</small></h3>
               {s.warnings.length > 0 && <div className="msg warn"><b>Perlu dicek:</b>{s.warnings.slice(0, 8).map((w, i) => <div key={i}>{w}</div>)}{s.warnings.length > 8 && <div>+{s.warnings.length - 8} peringatan lain</div>}</div>}
               {s.catatan.length > 0 && <div className="hint">Catatan di file (tidak diimpor): {s.catatan.join(' | ')}</div>}
-              <div className="tablewrap">
+              <div className="tablewrap" style={{ maxHeight: 420 }}>
                 <table className="grid">
                   <thead><tr>{CO_ADS_COLS.map((c) => <th key={c.key}>{c.label}</th>)}</tr></thead>
                   <tbody>{s.rows.slice(0, BATAS_PRATINJAU).map((r, i) => <tr key={i}>{CO_ADS_COLS.map((c) => <td key={c.key}>{r[c.key] ?? ''}</td>)}</tr>)}</tbody>

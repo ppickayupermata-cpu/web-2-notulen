@@ -7,9 +7,8 @@ import DataTable from '../components/DataTable.jsx'
 import InfoCard from '../components/InfoCard.jsx'
 import { filterGroups } from '../utils/filter.js'
 import { colsFor } from '../config.js'
-import Bantuan from '../components/Bantuan.jsx'
 
-const KIND = { ganti: 'Sebelum diganti', hapus: 'Sebelum dihapus', gabung: 'Sebelum digabung', pindah: 'Sebelum dipindah ke Barang Jadi', 'sebelum-pulih': 'Sebelum pemulihan' }
+const KIND = { ganti: 'Sebelum diganti', hapus: 'Sebelum dihapus', gabung: 'Sebelum digabung', 'sebelum-pulih': 'Sebelum pemulihan' }
 const G0 = { container: '', buyer: '' }
 
 // Halaman Data Pulihan: daftar file (cadangan container) yang bisa dipulihkan, tampilannya sama seperti Monitoring.
@@ -52,7 +51,7 @@ export default function DataPulihan({ embedded = false }) {
       <>
         <div className="toolbar wrap">
           <button className="btn" onClick={() => setView(null)}><ArrowLeft size={15} /> Kembali</button>
-          <h2 style={{ margin: 0 }}>Container {b.container} <small>Buyer {b.buyer || '-'} · data pulihan, hanya lihat</small><Bantuan topik="terpulihkan" /></h2>
+          <h2 style={{ margin: 0 }}>Container {b.container} <small>Buyer {b.buyer || '-'} · data pulihan, hanya lihat</small></h2>
           <span className="spacer" />
           <button className="btn" onClick={() => setInfo(b.id)}><Info size={15} /> Lihat info</button>
           <button className="btn primary" disabled={busy} onClick={() => pindah(b)}><ArchiveRestore size={15} /> Pindahkan ke Monitoring</button>
@@ -69,10 +68,11 @@ export default function DataPulihan({ embedded = false }) {
   return (
     <>
       {!embedded && <div className="toolbar"><h2 style={{ margin: 0 }}>Data Pulihan</h2></div>}
-      <FilterBar fields={GROUP_FIELDS} scope="Container, Buyer, Packing List" value={f} onChange={(v) => { setF(v); setMsg(null) }} onClear={() => setF(G0)} />
+      <p className="hint">File yang bisa dipulihkan. Cadangan dibuat otomatis sebelum container diganti, dihapus, atau digabung. Pindahkan ke Monitoring untuk memakainya lagi.</p>
+      <FilterBar fields={GROUP_FIELDS} value={f} onChange={(v) => { setF(v); setMsg(null) }} onClear={() => setF(G0)} />
       <div className="count">{shown.length} file pulihan</div>
       {msg && <div className={'msg ' + msg.type}>{msg.text}</div>}
-      {!shown.length ? <div className="empty">{list.length ? 'Tidak ada file yang cocok.' : 'Belum ada file pulihan.'}</div> : (
+      {!shown.length ? <div className="empty">{list.length ? 'Tidak ada file yang cocok.' : 'Belum ada file pulihan. Cadangan muncul di sini otomatis setelah ada container yang diganti, dihapus, atau digabung.'}</div> : (
         <div className="tablewrap">
           <table className="grid">
             <thead><tr><th>Container</th><th>Buyer</th><th>Packing List No</th><th>Ship Date</th><th>Status</th><th>Baris</th><th>Jenis</th><th>Dicadangkan</th><th>Di Monitoring</th><th>Aksi</th></tr></thead>

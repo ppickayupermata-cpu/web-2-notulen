@@ -8,5 +8,4 @@ export function addMonths(s, m) {
   const last = new Date(y, mo - 1 + m + 1, 0).getDate()
   return fmt(new Date(y, mo - 1 + m, Math.min(da, last)))
 }
-// 'YYYY-MM-DD' atau waktu lengkap ISO ('2026-11-10T03:10:00Z') -> 'DD/MM/YYYY'; nilai kosong / tak dikenal -> '-'
-export const showDate = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s ?? '')); return m ? `${m[3]}/${m[2]}/${m[1]}` : '-' }
+export const showDate = (s) => { const [y, m, d] = s.split('-'); return `${d}/${m}/${y}` }

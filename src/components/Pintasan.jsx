@@ -1,5 +1,9 @@
 import { X } from 'lucide-react'
-import { PINTASAN as L } from '../data/panduan.js'
+const L = [
+  ['Umum', [['Ctrl + K', 'Cari SO / PO / produk di semua container'], ['?', 'Buka daftar pintasan ini'], ['Esc', 'Tutup jendela / keluar layar penuh']]],
+  ['Tabel', [['Ctrl + F', 'Cari & Ganti'], ['Enter / Shift + Enter', 'Hasil cari berikutnya / sebelumnya'], ['Ctrl + Z / Ctrl + Y', 'Undo / Redo format'], ['Ctrl + C / Ctrl + V', 'Salin / tempel sel'], ['Ctrl + D / Ctrl + R', 'Isi ke bawah / ke kanan'], ['Shift + klik', 'Perluas pilihan sel'], ['Shift + scroll', 'Geser tabel ke kiri / kanan']]],
+  ['Catat Notulen', [['Enter di bullet', 'Bullet baru (Enter di bullet kosong = selesai)'], ['Tab / Shift + Tab', 'Bullet tingkat 2 / kembali'], ['- spasi di awal baris', 'Jadikan bullet']]],
+]
 export default function Pintasan({ onClose }) {
   return (
     <div className="overlay" onClick={onClose}>

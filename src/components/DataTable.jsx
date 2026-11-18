@@ -12,7 +12,7 @@ const isN = (x) => x !== '' && x != null && Number.isFinite(Number(x))
 const show = (c, v) => (c.type === 'date' && v && !String(v).startsWith('#') ? String(v).split('-').reverse().join('/') : v)
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch { return d } }
 
-export default function DataTable({ rows, cols: baseCols, editable = [], editing = false, getValue, onChange, selectable = false, selected = [], onToggle, onToggleAll, fileName, manage = false, groupId, onNotulen, onPack, compactTools = false, onChangeMany, leadExtras = null, onCursor, soActions = [] }) {
+export default function DataTable({ rows, cols: baseCols, editable = [], editing = false, getValue, onChange, selectable = false, selected = [], onToggle, onToggleAll, fileName, manage = false, groupId, onNotulen, onPack, compactTools = false, onChangeMany, leadExtras = null, onCursor }) {
   const { settings, setSettings, addRows, removeRows, rows: allRows, cellHistory, applyChanges } = useData()
   const { confirm, dialog } = useConfirm()
   const extra = (settings.cols || []).map((c) => ({ ...c, type: 'text' }))
@@ -73,17 +73,9 @@ export default function DataTable({ rows, cols: baseCols, editable = [], editing
   const cmp = sort && ((a, b) => String(calc(a, sort.key)).localeCompare(String(calc(b, sort.key)), 'id', { numeric: true }) * sort.dir)
   const vis = [...bySo.values()].flatMap((g) => (cmp ? [...g].sort(cmp) : g))
   const segs = []; for (const [so, g] of bySo) { const st = segs.length ? segs.at(-1).end : 0; segs.push({ so, start: st, end: st + g.length }) }
-  // Semua hook di atas baris return awal di bawah: jumlah hook harus sama di setiap render, termasuk saat hasil pencarian kosong.
-  useEffect(() => { // posisi kursor / sel yang sedang diketik dilaporkan (dipakai tampilan live untuk menunjukkan kursor admin)
-    if (!onCursor) return
-    const ok = !!sel && sel.a[0] < vis.length && sel.b[0] < vis.length
-    const r = ok && vis[Math.min(sel.a[0], sel.b[0])], c = ok && cols[Math.min(sel.a[1], sel.b[1])]
-    onCursor(r && c ? { rowId: r.id, key: c.key, editing: !!ed } : null)
-  }, [sel?.a?.[0], sel?.a?.[1], sel?.b?.[0], sel?.b?.[1], vis.length, ed?.id, ed?.key])
   if (!rows.length) return <div className="empty">Tidak ada data yang cocok.</div>
 
-  const selOk = !!sel && sel.a[0] < vis.length && sel.b[0] < vis.length   // seleksi yang sudah di luar baris (filter berubah / baris dihapus) dianggap tidak ada
-  const rg = selOk && { r0: Math.min(sel.a[0], sel.b[0]), r1: Math.max(sel.a[0], sel.b[0]), c0: Math.min(sel.a[1], sel.b[1]), c1: Math.max(sel.a[1], sel.b[1]) }
+  const rg = sel && { r0: Math.min(sel.a[0], sel.b[0]), r1: Math.max(sel.a[0], sel.b[0]), c0: Math.min(sel.a[1], sel.b[1]), c1: Math.max(sel.a[1], sel.b[1]) }
   const inR = (i, c) => rg && i >= rg.r0 && i <= rg.r1 && c >= rg.c0 && c <= rg.c1
   // perubahan banyak sel sekaligus (paste, isi bawah, hapus, ganti semua) = SATU langkah Undo di halaman Input
   const many = (list) => { if (!list.length) return; onChangeMany ? onChangeMany(list) : list.forEach((x) => onChange(x.id, x.key, x.v)) }
@@ -183,7 +175,7 @@ export default function DataTable({ rows, cols: baseCols, editable = [], editing
   const okEdit = (r, c) => !!(editing && r && c && edt.includes(c.key))
   const reveal = (i, ci) => requestAnimationFrame(() => wrapRef.current?.querySelector(`[data-rc="${i},${ci}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }))
   const clampI = (i) => Math.max(0, Math.min(vis.length - 1, i)), clampC = (c) => Math.max(0, Math.min(cols.length - 1, c))
-  const go = (i, ci) => { if (!vis.length) return; const ni = clampI(i), nc = clampC(ci); setSel({ a: [ni, nc], b: [ni, nc] }); reveal(ni, nc) }
+  const go = (i, ci) => { const ni = clampI(i), nc = clampC(ci); setSel({ a: [ni, nc], b: [ni, nc] }); reveal(ni, nc) }
   const done = () => { setEd(null); wrapRef.current?.focus({ preventScroll: true }) }
   const startEdit = (i, ci) => { const r = vis[i], c = cols[ci]; if (okEdit(r, c)) setEd({ id: r.id, key: c.key, orig: val(r, c.key) ?? '' }) }
   const editKey = (e, i, ci, r, c, multi) => {
@@ -217,7 +209,6 @@ export default function DataTable({ rows, cols: baseCols, editable = [], editing
     setPasteMsg(`${ch.length} sel ditempel` + (bad ? ` · ${bad} tanggal tidak bisa dibaca (dilewati)` : '') + (skip ? ` · ${skip} sel di kolom yang tidak bisa diisi dilewati` : '')); setTimeout(() => setPasteMsg(''), 6000)
   }
   const onKey = (e) => {
-    if (!vis.length) return
     if (hot(e)) return
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo() }
@@ -246,6 +237,11 @@ export default function DataTable({ rows, cols: baseCols, editable = [], editing
   const nLate = un.filter((r) => tgt(r) && tgt(r) < todayS && !kirimOf(r)).length, nToday = un.filter((r) => tgt(r) === todayS).length
   const nNoArea = un.filter((r) => !String(calc(r, 'area') ?? '').trim()).length
   const perArea = Object.entries(un.reduce((m, r) => { const a = String(calc(r, 'area') ?? '').trim().toUpperCase(); if (a) m[a] = (m[a] || 0) + 1; return m }, {})).sort((a, b) => b[1] - a[1])
+  useEffect(() => { // posisi kursor / sel yang sedang diketik dilaporkan (dipakai tampilan live untuk menunjukkan kursor admin)
+    if (!onCursor) return
+    const r = rg && vis[rg.r0], c = rg && cols[rg.c0]
+    onCursor(r && c ? { rowId: r.id, key: c.key, editing: !!ed } : null)
+  }, [rg?.r0, rg?.c0, ed?.id, ed?.key])
   const bukaRh = async () => { if (!rg || !vis[rg.r0] || !cols[rg.c0]) return; const row = vis[rg.r0], col = cols[rg.c0]; setRh({ row, col, list: null }); setRh({ row, col, list: await cellHistory(row.id, col.key) }) }
   const kembalikan = async (e) => { if (!(await confirm({ title: 'Kembalikan nilai sel?', message: `Sel ${rh.col.label} diubah kembali menjadi "${show(rh.col, e.old) || '(kosong)'}".`, confirmLabel: 'Kembalikan' }))) return; await applyChanges({ [rh.row.id]: { [rh.col.key]: e.old } }); setRh(null) }
   const B = ({ t, d, f, children, cls = 'icon-btn dark' }) => <button className={cls} disabled={d} title={t} onClick={f}>{children}</button>
@@ -344,7 +340,7 @@ export default function DataTable({ rows, cols: baseCols, editable = [], editing
         {segs.map((sg, si) => (
           <div key={sg.so} className="sobox" style={{ containIntrinsicSize: 'auto ' + (80 + (sg.end - sg.start) * 38) + 'px' }}>
             <div className="sotitle">SO {sg.so}<small> · {sg.end - sg.start} baris</small>
-              <span className="sotools"><button className="btn sm" title="Sesuaikan lebar kolom dengan isinya (klik dua kali tepi header untuk satu kolom)" onClick={() => fit(sg.so)}><MoveHorizontal size={14} /> Auto-fit</button><button className="btn sm" title="Pakai ukuran kolom tabel ini untuk semua tabel" onClick={() => samakan(sg.so)}>Samakan ke semua</button><button className="btn sm" title="Kembalikan ukuran tabel ini ke bawaan" disabled={!wd.so?.[sg.so]} onClick={() => resetT(sg.so)}>Reset ukuran</button>{soActions.map((a) => <button key={a.key} className={'btn sm ' + (a.cls || '')} title={a.title} disabled={a.disabled} onClick={() => a.onClick(sg.so)}>{a.icon}{a.label}</button>)}</span></div>
+              <span className="sotools"><button className="btn sm" title="Sesuaikan lebar kolom dengan isinya (klik dua kali tepi header untuk satu kolom)" onClick={() => fit(sg.so)}><MoveHorizontal size={14} /> Auto-fit</button><button className="btn sm" title="Pakai ukuran kolom tabel ini untuk semua tabel" onClick={() => samakan(sg.so)}>Samakan ke semua</button><button className="btn sm" title="Kembalikan ukuran tabel ini ke bawaan" disabled={!wd.so?.[sg.so]} onClick={() => resetT(sg.so)}>Reset ukuran</button></span></div>
             <table className={'grid fx' + (editing ? ' ex' : '')} style={{ width: tableW(sg.so) }}>
               <colgroup>{onPack && <col style={{ width: LP }} />}<col style={{ width: 56 }} />{selectable && <col style={{ width: 34 }} />}{cols.map((c) => <col key={c.key} style={{ width: W(c.key, sg.so) }} />)}{onPack && <col style={{ width: RP }} />}</colgroup>
               <thead>
@@ -403,7 +399,7 @@ export default function DataTable({ rows, cols: baseCols, editable = [], editing
           </div>
         ))}
       </div>
-      <div className="statfoot" role="status" aria-live="polite">{pasteMsg ? <b>{pasteMsg}</b> : st && st.n > 0 ? <><span>{st.cells} sel dipilih</span><span>Terisi: {st.n}</span>{st.k > 0 && <><span>Jumlah: <b>{nf(st.sm)}</b></span><span>Rata-rata: <b>{nf(st.sm / st.k)}</b></span><span>Min: {nf(st.mn)}</span><span>Maks: {nf(st.mx)}</span></>}</> : <span>{vis.length} baris · {segs.length} SO</span>}</div>
+      <div className="statfoot" role="status" aria-live="polite">{pasteMsg ? <b>{pasteMsg}</b> : st && st.n > 0 ? <><span>{st.cells} sel dipilih</span><span>Terisi: {st.n}</span>{st.k > 0 && <><span>Jumlah: <b>{nf(st.sm)}</b></span><span>Rata-rata: <b>{nf(st.sm / st.k)}</b></span><span>Min: {nf(st.mn)}</span><span>Maks: {nf(st.mx)}</span></>}</> : <span>{editing ? 'Klik sel untuk memilih · klik 2x / F2 / ketik untuk mengisi · Enter / Tab simpan & pindah · Esc batal · bisa paste banyak sel dari Excel' : 'Pilih sel untuk melihat jumlah, rata-rata, dan lainnya.'}</span>}</div>
       {rh && <div className="overlay" onClick={() => setRh(null)}><div className="modal" role="dialog" aria-modal="true" aria-label="Riwayat sel" style={{ width: 'min(560px,94vw)' }} onClick={(e) => e.stopPropagation()}>
         <div className="toolbar"><h3 style={{ margin: 0 }}>Riwayat sel · {rh.col.label}</h3><span className="spacer" /><button className="icon-btn" aria-label="Tutup" onClick={() => setRh(null)}><X size={18} /></button></div>
         <p className="hint">SO {rh.row.so || '-'} · PO {rh.row.po || '-'} · {rh.row.productName}</p>

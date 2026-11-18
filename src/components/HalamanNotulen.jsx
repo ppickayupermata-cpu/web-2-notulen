@@ -105,6 +105,7 @@ export default function HalamanNotulen({ text, done, onText, onPeserta, onSusun,
         <button className="btn sm" {...btn({ onClick: () => toggle(['text', 'bullet'], 'head'), title: 'Jadikan / lepas judul tebal (diawali *)' })}><Heading1 size={14} /> Judul</button>
         <button className="btn sm" {...btn({ onClick: onPeserta, title: 'Perbarui daftar peserta (absen QR + manual) tanpa mengubah bagian lain' })}><UserPlus size={14} /> Peserta terbaru</button>
         <button className="btn sm" disabled={!canSusun} {...btn({ onClick: onSusun, title: 'Isi ulang seluruh halaman dari tabel dan data meeting' })}><Wand2 size={14} /> Susun ulang</button>
+        <span className="hint">Klik langsung di halaman lalu ketik apa saja. Enter di bullet = bullet baru, Enter di bullet kosong = selesai, Tab / Shift+Tab = bullet tingkat 2. Ketik "- " di awal baris untuk bullet.</span>
       </div>
       <div ref={ref} className="doc" contentEditable suppressContentEditableWarning spellCheck={false} role="textbox" aria-multiline="true" aria-label="Halaman notulen (bisa diedit langsung)"
         onInput={onInput} onKeyDown={onKeyDown} onPaste={onPaste} onBlur={onBlur} />

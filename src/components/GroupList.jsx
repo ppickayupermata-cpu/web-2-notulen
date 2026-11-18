@@ -11,6 +11,7 @@ export default function GroupList({ groups, rows, actions, empty, canEdit, onSav
   const simpan = async (g) => { const e = ed; setEd(null); if (e && e.v !== (g[e.k] ?? '')) await onSave(g.id, { ...g, [e.k]: e.v }) }
   return (
     <>
+      {canEdit && <p className="hint" style={{ margin: '0 0 6px' }}>Klik 2x pada Container, Buyer, Packing List No, Ship Date, atau Status untuk mengubahnya langsung.</p>}
       <div className="tablewrap">
         <table className="grid">
           <thead><tr>{F.map(([, l]) => <th key={l}>{l}</th>)}<th>Baris</th><th>Aksi</th></tr></thead>

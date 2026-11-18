@@ -1,4 +1,4 @@
-import { pastikanLive, pastikanLiveGlobal, randomUUID, snapshot, backupStmts, tanggalPulih, getSql, ensureDb, verifyToken, readBody, send, fail, clip, todayTZ, logQ } from './_lib.js'
+import { pastikanLive, randomUUID, snapshot, backupStmts, tanggalPulih, getSql, ensureDb, verifyToken, readBody, send, fail, clip, todayTZ, logQ } from './_lib.js'
 
 const STAGES = ['area', 'target', 'ket', 'kirim']
 const INFO = ['productCode', 'productName', 'po', 'so', 'soItem', 'material', 'type', 'size', 'qty', 'uom', 'group', 'no']
@@ -54,18 +54,9 @@ export default async function handler(req, res) {
         else if (typeof b.enabled === 'boolean') { await db`update live_links set enabled = ${b.enabled} where group_id = ${gid}`; l = (await db`select token, enabled from live_links where group_id = ${gid}`)[0] }
         return send(res, 200, { token: l.token, enabled: l.enabled })
       }
-      case 'liveMeetingLink': { // satu link live untuk meeting (otomatis mengikuti container yang sedang dibuka host)
-        let l = await pastikanLiveGlobal(db)
-        if (b.rotate) { await db`update live_global set token = ${randomUUID().replace(/-/g, '').slice(0, 20)}, enabled = true where id = 'main'`; l = (await db`select token, enabled from live_global where id = 'main'`)[0] }
-        else if (typeof b.enabled === 'boolean') { await db`update live_global set enabled = ${b.enabled} where id = 'main'`; l = (await db`select token, enabled from live_global where id = 'main'`)[0] }
-        return send(res, 200, { token: l.token, enabled: l.enabled })
-      }
       case 'livePresence': { // admin yang sedang di halaman Input: kursor + isian yang BELUM di-Submit; tampilan live menunjukkannya langsung (kedaluwarsa 20 detik tanpa denyut)
         const gid = String(b.groupId || '')
-        if (b.clear) { // host meninggalkan container: ingat sebagai container terakhir untuk link live meeting
-          await db`update live_global set last_group_id = ${gid}, last_at = now() where id = 'main'`
-          await db`delete from live_presence where group_id = ${gid}`; return send(res, 200, { ok: true })
-        }
+        if (b.clear) { await db`delete from live_presence where group_id = ${gid}`; return send(res, 200, { ok: true }) }
         const [g] = await db`select id from groups where id = ${gid}`
         if (!g) return send(res, 404, { error: 'Container tidak ditemukan.' })
         const draft = {}; let n = 0
@@ -163,68 +154,6 @@ export default async function handler(req, res) {
         for (const r of rows) { const c = per.get(r.group_id); if (!c) continue; const d = r.data || {}; c.n++; if (d.packed) c.packed++; if (['area', 'target', 'ket', 'kirim'].some((k) => String(d[k] ?? '').trim())) c.isi++ }
         return send(res, 200, { id: sn.id, at: sn.at, kind: sn.kind, by: sn.by, jadwal: schedules.length,
           groups: groups.map((g) => ({ container: g.container, buyer: g.buyer, packingListNo: g.packing_list_no, shipDate: g.ship_date, status: g.status, addedAt: g.added_at, ...per.get(g.id) })) })
-      }
-      case 'finishRows': { // pindahkan baris terpilih (mis. satu SO) dari Monitoring ke daftar Barang Jadi
-        const [g] = await db`select id, container, buyer, packing_list_no, ship_date, status, revision, added_at, kind from groups where id = ${String(b.groupId)}`
-        if (!g) return send(res, 404, { error: 'Container tidak ditemukan.' })
-        const want = JSON.stringify([...new Set((Array.isArray(b.ids) ? b.ids : []).map(String))].slice(0, 5000))
-        const hit = await db`select id from rows where group_id = ${g.id} and id in (select jsonb_array_elements_text(${want}::jsonb))`
-        if (!hit.length) return send(res, 400, { error: 'Tidak ada baris yang bisa dipindahkan.' })
-        const list = JSON.stringify(hit.map((x) => x.id))
-        const [{ n: sisa }] = await db`select count(*)::int as n from rows where group_id = ${g.id} and id not in (select jsonb_array_elements_text(${list}::jsonb))`
-        await db.transaction([
-          db`insert into finished_groups(container, buyer, packing_list_no, ship_date, status, revision, kind, added_at) values (${g.container}, ${g.buyer}, ${g.packing_list_no}, ${g.ship_date}, ${g.status}, ${g.revision}, ${kindOf(g.kind)}, ${g.added_at})
-             on conflict (container) do update set buyer = excluded.buyer, packing_list_no = excluded.packing_list_no, ship_date = excluded.ship_date, status = excluded.status, revision = excluded.revision, kind = excluded.kind, updated_at = now()`,
-          db`insert into finished_rows(id, container, so, data, moved_by) select r.id, ${g.container}::text, coalesce(r.data->>'so', ''), r.data, ${user.username}::text from rows r
-             where r.group_id = ${g.id} and r.id in (select jsonb_array_elements_text(${list}::jsonb))
-             on conflict (id) do update set container = excluded.container, so = excluded.so, data = excluded.data, moved_at = now(), moved_by = excluded.moved_by`,
-          db`delete from rows where group_id = ${g.id} and id in (select jsonb_array_elements_text(${list}::jsonb))`,
-          db`delete from groups where id = ${g.id} and not exists (select 1 from rows where group_id = ${g.id})`,
-          logQ(db, 'barang', user.username, `Pindah ke Barang Jadi: Container ${g.container} · ${hit.length} baris${sisa ? '' : ' (container kosong, dihapus dari Monitoring)'}`),
-        ])
-        return send(res, 200, { ok: true, moved: hit.length, emptied: !sisa })
-      }
-      case 'unfinishRows': { // kembalikan baris Barang Jadi ke Monitoring (container dibuat lagi bila sudah tidak ada)
-        const container = String(b.container || '')
-        const [fg] = await db`select container, buyer, packing_list_no, ship_date, status, revision, kind from finished_groups where container = ${container}`
-        if (!fg) return send(res, 404, { error: 'Container tidak ada di Barang Jadi.' })
-        const want = JSON.stringify([...new Set((Array.isArray(b.ids) ? b.ids : []).map(String))].slice(0, 5000))
-        const hit = await db`select id from finished_rows where container = ${container} and id in (select jsonb_array_elements_text(${want}::jsonb))`
-        if (!hit.length) return send(res, 400, { error: 'Tidak ada baris yang bisa dikembalikan.' })
-        const list = JSON.stringify(hit.map((x) => x.id))
-        const [live] = await db`select id from groups where container = ${container}`
-        const gid = live?.id || randomUUID(), stmts = []
-        if (!live) stmts.push(db`insert into groups(id, container, buyer, packing_list_no, ship_date, status, revision, added_at, kind) values (${gid}, ${container}, ${fg.buyer}, ${fg.packing_list_no}, ${fg.ship_date}, ${fg.status}, ${fg.revision}, ${todayTZ()}, ${kindOf(fg.kind)})`)
-        stmts.push(
-          db`insert into rows(id, group_id, data) select f.id, ${gid}::text, f.data from finished_rows f where f.container = ${container} and f.id in (select jsonb_array_elements_text(${list}::jsonb)) on conflict (id) do nothing`,
-          db`delete from finished_rows f where f.container = ${container} and f.id in (select jsonb_array_elements_text(${list}::jsonb)) and exists (select 1 from rows r where r.id = f.id and r.group_id = ${gid})`,
-          db`delete from finished_groups g where g.container = ${container} and not exists (select 1 from finished_rows f where f.container = g.container)`,
-          logQ(db, 'barang', user.username, `Kembali dari Barang Jadi: Container ${container} · ${hit.length} baris`),
-        )
-        await db.transaction(stmts)
-        return send(res, 200, { ok: true, restored: hit.length, recreated: !live })
-      }
-      case 'finishedRows': { // isi satu container di Barang Jadi (untuk tabel lihat-saja)
-        const container = String(b.container || '')
-        const [fg] = await db`select container, buyer, packing_list_no, ship_date, status, revision, kind from finished_groups where container = ${container}`
-        if (!fg) return send(res, 404, { error: 'Container tidak ada di Barang Jadi.' })
-        const r = await db`select id, data, moved_at, moved_by from finished_rows where container = ${container} order by seq limit 5000`
-        return send(res, 200, { group: { container: fg.container, buyer: fg.buyer || '', packingListNo: fg.packing_list_no || '', shipDate: fg.ship_date || '', status: fg.status || '', revision: fg.revision || '', kind: fg.kind || '' }, rows: r.map((x) => ({ ...x.data, id: x.id, movedAt: x.moved_at, movedBy: x.moved_by })) })
-      }
-      case 'searchAll': { // pencarian menyeluruh: Barang Jadi (isi baris), Cadangan per container, Cadangan penuh. Monitoring / jadwal hapus dicari di browser.
-        const terms = String(b.q || '').toLowerCase().split(/\s+/).filter(Boolean).slice(0, 4).map((t) => '%' + t.replace(/[\\%_]/g, '\\$&') + '%')
-        if (!terms.length || terms.join('').length < 4) return send(res, 200, { finished: [], backups: [], snapshots: [] })
-        const pats = JSON.stringify(terms)
-        const [fin, bk, sn] = await Promise.all([
-          db`select id, container, so, data, moved_at from finished_rows where (data::text || ' ' || container) ilike all (select jsonb_array_elements_text(${pats}::jsonb)) order by moved_at desc limit 40`,
-          db`select id, container, at, kind, n from backups b where kind <> 'pindah' and not exists (select 1 from logs l where l.type = 'barang' and l.container = b.container and abs(extract(epoch from (l.at - b.at))) < 5) and (payload::text || ' ' || container) ilike all (select jsonb_array_elements_text(${pats}::jsonb)) order by at desc limit 20`,
-          db`select id, at, kind, n_groups, n_rows from snapshots where payload::text ilike all (select jsonb_array_elements_text(${pats}::jsonb)) order by at desc limit 10`,
-        ])
-        return send(res, 200, {
-          finished: fin.map((x) => ({ id: x.id, container: x.container, so: x.so, po: x.data.po || '', productName: x.data.productName || '', area: x.data.area || '', target: x.data.target || '', ket: x.data.ket || '', movedAt: x.moved_at })),
-          backups: bk.map((x) => ({ id: x.id, container: x.container, at: x.at, kind: x.kind, count: x.n })),
-          snapshots: sn.map((x) => ({ id: x.id, at: x.at, kind: x.kind, groups: x.n_groups, rows: x.n_rows })),
-        })
       }
       case 'clearLabels': { // hapus label old / new di satu container
         const gid = String(b.groupId || '')
