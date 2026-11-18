@@ -5,9 +5,12 @@ export const useUi = () => useContext(Ui)
 
 // Tema (terang/gelap) + mode layar penuh. Di layar penuh, kolom pencarian disembunyikan dan hanya muncul lewat toggle.
 export function UiProvider({ children }) {
-  const [theme, setTheme] = useState(() => localStorage.getItem('pl_theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'))
+  const [theme, setTheme] = useState(() => localStorage.getItem('pl_theme') || 'light')
   const [fs, setFs] = useState(false)
   const [showFilter, setShowFilter] = useState(false)
+  const [panduan, setPanduan] = useState({ buka: false, topik: 'mulai' }) // panel Panduan (teks pandu semua halaman ada di data/panduan.js)
+  const bukaPanduan = (topik) => setPanduan((p) => ({ buka: true, topik: topik || p.topik }))
+  const tutupPanduan = () => setPanduan((p) => ({ ...p, buka: false }))
   const [jump, setJump] = useState(null) // { groupId, so }: lompat dari pencarian global ke tabel Monitoring
   useEffect(() => { document.documentElement.dataset.theme = theme; try { localStorage.setItem('pl_theme', theme) } catch {} }, [theme])
   useEffect(() => {
@@ -22,5 +25,5 @@ export function UiProvider({ children }) {
     else if (document.fullscreenElement) document.exitFullscreen()
   }
   const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
-  return <Ui.Provider value={{ theme, toggleTheme, fs, toggleFs, showFilter, setShowFilter, jump, setJump }}>{children}</Ui.Provider>
+  return <Ui.Provider value={{ theme, toggleTheme, fs, toggleFs, showFilter, setShowFilter, jump, setJump, panduan, bukaPanduan, tutupPanduan }}>{children}</Ui.Provider>
 }

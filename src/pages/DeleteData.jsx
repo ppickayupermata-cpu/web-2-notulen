@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useFill } from '../utils/useFill.js'
+import Bantuan from '../components/Bantuan.jsx'
 import ByContainer from './delete/ByContainer.jsx'
 import ByRows from './delete/ByRows.jsx'
 import Schedules from './delete/Schedules.jsx'
@@ -10,10 +12,11 @@ const TABS = [
 ]
 
 export default function DeleteData({ by }) {
+  useFill()
   const [tab, setTab] = useState('container')
   return (
     <>
-      <h2>Hapus Data</h2>
+      <h2>Hapus Data<Bantuan topik="hapus" /></h2>
       <div className="tabs">
         {TABS.map((t) => (
           <button key={t.id} className={tab === t.id ? 'tab active' : 'tab'} onClick={() => setTab(t.id)}>{t.text}</button>

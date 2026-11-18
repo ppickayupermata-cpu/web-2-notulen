@@ -7,6 +7,7 @@ import DataTable from '../components/DataTable.jsx'
 import { filterGroups } from '../utils/filter.js'
 import { colsFor } from '../config.js'
 import { kunciSo } from '../utils/barangJadi.js'
+import Bantuan from '../components/Bantuan.jsx'
 
 const G0 = { container: '', buyer: '' }
 const tgl = (v) => (v ? new Date(v).toLocaleString('id-ID') : '-')
@@ -42,7 +43,7 @@ export default function BarangJadi() {
       <>
         <div className="toolbar wrap">
           <button className="btn" onClick={() => { setView(null); setMsg(null) }}><ArrowLeft size={15} /> Kembali</button>
-          <h2 style={{ margin: 0 }}>Barang Jadi · Container {g.container} <small>Buyer {g.buyer || '-'} · hanya lihat</small></h2>
+          <h2 style={{ margin: 0 }}>Barang Jadi · Container {g.container} <small>Buyer {g.buyer || '-'} · hanya lihat</small><Bantuan topik="barangjadi" /></h2>
           <span className="spacer" />
           <button className="btn primary" disabled={busy} onClick={() => kembalikan(g.container, view.rows.map((r) => r.id), `Semua SO Container ${g.container}`)}><Undo2 size={15} /> Kembalikan semua</button>
         </div>
@@ -56,11 +57,10 @@ export default function BarangJadi() {
 
   return (
     <>
-      <p className="hint">SO yang sudah selesai disimpan di sini dari tombol <b>Simpan ke list Barang Jadi</b> pada tabel Input. Tidak ikut terhapus otomatis, dan bisa dikembalikan kapan saja.</p>
       <FilterBar fields={GROUP_FIELDS} scope="Container, Buyer, Packing List" value={f} onChange={(v) => { setF(v); setMsg(null) }} onClear={() => setF(G0)} />
       <div className="count">{shown.length} container di Barang Jadi</div>
       {msg && <div className={'msg ' + msg.type}>{msg.text}</div>}
-      {!shown.length ? <div className="empty">{finished?.length ? 'Tidak ada container yang cocok.' : 'Belum ada barang jadi. Buka Input pada sebuah container, lalu klik Simpan ke list Barang Jadi di header SO.'}</div> : (
+      {!shown.length ? <div className="empty">{finished?.length ? 'Tidak ada container yang cocok.' : 'Belum ada barang jadi.'}</div> : (
         <div className="tablewrap">
           <table className="grid">
             <thead><tr><th>Container</th><th>Buyer</th><th>Packing List No</th><th>Ship Date</th><th>Status</th><th>SO</th><th>Baris</th><th>Terakhir dipindah</th><th>Aksi</th></tr></thead>

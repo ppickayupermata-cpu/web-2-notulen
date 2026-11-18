@@ -11,7 +11,8 @@ const f = (r) => ({ area: String(r.area || '').trim().replace(/\s+/g, ' ').toUpp
 function baris(rows) {
   const peta = new Map()
   for (const r of rows) {
-    const { area, tg, ket, so, po } = f(r), e = peta.get(so + '|' + po) || peta.set(so + '|' + po, { so, po, seg: new Map() }).get(so + '|' + po)
+    const { area, tg, ket, so, po } = f(r), e = peta.get(so + '|' + po) || peta.set(so + '|' + po, { so, po, seg: new Map(), at: '' }).get(so + '|' + po)
+    if (r.packed && (!e.at || String(r.packed) < e.at)) e.at = String(r.packed)   // waktu paling awal baris PO ini dicentang (tag packing)
     const s = e.seg.get(area + '|' + tg) || e.seg.set(area + '|' + tg, { area, tg, kets: [] }).get(area + '|' + tg)
     if (ket && !s.kets.includes(ket)) s.kets.push(ket)
   }
@@ -19,7 +20,7 @@ function baris(rows) {
   return [...peta.values()].map((e) => {
     const l = [...e.seg.values()], segs = (l.some(adaIsi) ? l.filter(adaIsi) : l.slice(0, 1))
       .map((s) => e.po + (s.area ? ` ada di ${s.area}` : '') + (s.tg ? ` target selesai ${s.tg}` : '') + (s.kets.length ? `, ( ${s.kets.join('; ')} )` : ''))
-    return { so: e.so, po: e.po, segs, t: (e.so ? e.so + ', ' : '') + segs.join(', '), order: '' }
+    return { so: e.so, po: e.po, segs, t: (e.so ? e.so + ', ' : '') + segs.join(', '), order: '', at: e.at }
   })
 }
 // Rincian per AREA (untuk ringkasan di bawah notulen): satu entri per kombinasi AREA + SO + PO + TARGET, KETERANGAN yang berbeda digabung.
@@ -33,6 +34,8 @@ export function rincianArea(rows) {
   }
   return [...m.values()]
 }
+// pembanding urutan dicentang: waktu lebih awal dulu; yang tanpa waktu (data lama) di belakang; sama = urutan tabel (sort stabil)
+export const urutCentang = (x, y) => (x.at && y.at ? (x.at < y.at ? -1 : x.at > y.at ? 1 : 0) : x.at ? -1 : y.at ? 1 : 0)
 export function dariTabel(rows) {
   const belum = [], sudah = []; let kosong = 0
   for (const r of rows) {
@@ -40,6 +43,7 @@ export function dariTabel(rows) {
     else if (String(r.area || '').trim() || String(r.target || '').trim() || String(r.ket || '').trim()) belum.push(r)   // baris yang belum diisi di meeting tidak masuk notulen
     else kosong++
   }
-  const a = baris(belum), b = baris(sudah).map((x) => ({ ...x, selesai: true, color: WARNA_SELESAI }))
+  // yang sudah dicentang diurutkan menurut WAKTU dicentang: yang pertama dicentang paling atas, berikutnya di bawahnya
+  const a = baris(belum), b = baris(sudah).map((x) => ({ ...x, selesai: true, color: WARNA_SELESAI })).sort(urutCentang)
   return { items: [...a, ...b], rincian: rincianArea(belum), utama: a.length, selesai: b.length, kosong, baris: belum.length + sudah.length, po: new Set([...belum, ...sudah].map((r) => f(r).so + '|' + f(r).po)).size }
 }

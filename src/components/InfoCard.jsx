@@ -3,7 +3,7 @@ import { X } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { ringkas } from '../utils/ringkasBackup.js'
 
-const KIND = { ganti: 'Sebelum diganti upload baru', hapus: 'Sebelum dihapus', gabung: 'Sebelum digabung / dipindah', 'sebelum-pulih': 'Sebelum pemulihan', harian: 'Otomatis harian', manual: 'Manual' }
+const KIND = { ganti: 'Sebelum diganti upload baru', hapus: 'Sebelum dihapus', gabung: 'Sebelum digabung / dipindah', pindah: 'Sebelum dipindah ke Barang Jadi', 'sebelum-pulih': 'Sebelum pemulihan', harian: 'Otomatis harian', manual: 'Manual' }
 const tgl = (v) => (v ? new Date(v).toLocaleString('id-ID') : '-')
 const Baris = ({ k, v }) => <div className="ir"><span>{k}</span><b>{v === '' || v == null ? '-' : v}</b></div>
 
@@ -20,7 +20,7 @@ export default function InfoCard({ type, id, onClose }) {
 
   let body = <div className="empty">{err || 'Memuat info...'}</div>
   if (d && type === 'backup') {
-    const r = ringkas(d.rows), g = d.group || {}, ada = groups.find((x) => x.container === d.container), nAda = ada ? now.filter((x) => x.groupId === ada.id).length : 0
+    const r = ringkas(d.rows || []), g = d.group || {}, ada = groups.find((x) => x.container === d.container), nAda = ada ? now.filter((x) => x.groupId === ada.id).length : 0
     const pct = (n) => (r.total ? `${n} dari ${r.total} baris (${Math.round((n / r.total) * 100)}%)` : '0')
     body = (
       <>
@@ -44,7 +44,7 @@ export default function InfoCard({ type, id, onClose }) {
         <h4>Tentang cadangan ini</h4>
         <div className="igrid"><Baris k="Jenis" v={KIND[d.kind] || d.kind} /><Baris k="Dibuat" v={tgl(d.at)} /><Baris k="Oleh" v={d.by || 'Sistem'} /><Baris k="Container" v={d.groups.length} /><Baris k="Total baris" v={tot} /><Baris k="Jadwal hapus" v={d.jadwal} /></div>
         <h4>Isi per container</h4>
-        <div className="tablewrap" style={{ maxHeight: 320 }}><table className="grid"><thead><tr><th>Container</th><th>Buyer</th><th>Packing List No</th><th>Tgl upload</th><th>Baris</th><th>Terisi</th><th>Packing</th></tr></thead>
+        <div className="tablewrap"><table className="grid"><thead><tr><th>Container</th><th>Buyer</th><th>Packing List No</th><th>Tgl upload</th><th>Baris</th><th>Terisi</th><th>Packing</th></tr></thead>
           <tbody>{d.groups.map((g, i) => <tr key={i}><td>{g.container}</td><td>{g.buyer}</td><td>{g.packingListNo}</td><td>{g.addedAt}</td><td>{g.n}</td><td>{g.isi}</td><td>{g.packed}</td></tr>)}</tbody></table></div>
       </>
     )

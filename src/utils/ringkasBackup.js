@@ -1,7 +1,7 @@
 // Ringkasan isi satu cadangan container (untuk kartu info)
 const kosong = (v) => String(v ?? '').trim() === ''
 const angka = (v) => { const n = Number(String(v ?? '').replace(/,/g, '')); return Number.isFinite(n) ? n : 0 }
-export function ringkas(rows) {
+export function ringkas(rows = []) {
   const so = new Map(), po = new Set(), area = new Map()
   const r = { total: rows.length, qty: 0, packed: 0, area: 0, target: 0, ket: 0, kirim: 0, old: 0, new: 0, so: [], po: 0, perArea: [], tglTarget: '' }
   for (const x of rows) {

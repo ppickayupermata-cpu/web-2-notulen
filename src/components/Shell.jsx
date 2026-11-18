@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Menu, LogOut, Maximize, Minimize, Sun, Moon, Search, Keyboard, WifiOff, Check, Loader2 } from 'lucide-react'
+import { Menu, LogOut, Maximize, Minimize, Sun, Moon, Search, Keyboard, WifiOff, Check, Loader2, BookOpen } from 'lucide-react'
 import CariGlobal from './CariGlobal.jsx'
 import Pintasan from './Pintasan.jsx'
+import Panduan from './Panduan.jsx'
 import FsFab from './FsFab.jsx'
 import { useUi } from '../context/UiContext.jsx'
 import Sidebar from './Sidebar.jsx'
@@ -28,8 +29,17 @@ export default function Shell({ user, onLogout }) {
     window.addEventListener('online', on); window.addEventListener('offline', off); window.addEventListener('keydown', key)
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); window.removeEventListener('keydown', key) }
   }, [])
-  const pick = (r) => { setJump({ groupId: r.groupId, so: r.so }); setPage('monitoring'); setCari(false) }
-  const { theme, toggleTheme, fs, toggleFs, showFilter, setShowFilter } = useUi()
+  const [navKey, setNavKey] = useState(0)   // memaksa halaman tujuan dibuka ulang agar membaca tab / kata cari dari hasil pencarian
+  const pick = (it) => { // it dari CariGlobal: isi container | jadwal hapus | barang jadi | cadangan
+    const simpan = (k, v) => { try { sessionStorage.setItem(k, v) } catch { /* mode privat */ } }
+    if (it.kind === 'isi') { setJump({ groupId: it.r.groupId, so: it.r.so }); setPage('monitoring') }
+    else if (it.kind === 'jadwal') setPage('delete')
+    else if (it.kind === 'barang') { simpan('pl_mon_tab', 'barang'); simpan('pl_q', it.container); setNavKey((k) => k + 1); setPage('monitoring') }
+    else { simpan('pl_cad_tab', it.kind === 'penuh' ? 'penuh' : 'container'); simpan('pl_q', it.container || ''); setNavKey((k) => k + 1); setPage('cadangan') }
+    setCari(false)
+  }
+  const { theme, toggleTheme, fs, toggleFs, showFilter, setShowFilter, panduan, bukaPanduan, tutupPanduan } = useUi()
+  useEffect(() => { const k = (e) => { if (e.key === 'F1') { e.preventDefault(); bukaPanduan() } }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [])
   const ThemeIcon = theme === 'dark' ? Sun : Moon
   const [navFs, setNavFs] = useState(false) // di layar penuh sidebar jadi laci yang menimpa tabel, tertutup sampai hamburger diklik
   useEffect(() => { if (!fs) setNavFs(false) }, [fs])
@@ -43,6 +53,7 @@ export default function Shell({ user, onLogout }) {
           : saving ? <span className="savestat busy" role="status"><Loader2 size={14} className="spin" /> Menyimpan…</span>
           : lastSaved ? <span className="savestat ok" role="status"><Check size={14} /> Tersimpan {lastSaved.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span> : null}
         <button className="icon-btn" onClick={() => setCari(true)} title="Cari di semua container (Ctrl+K)"><Search size={18} /></button>
+        <button className="icon-btn" onClick={() => (panduan.buka ? tutupPanduan() : bukaPanduan())} title="Panduan & cara pakai (F1)" aria-pressed={panduan.buka}><BookOpen size={18} /></button>
         <button className="icon-btn" onClick={() => setPin(true)} title="Pintasan keyboard (?)"><Keyboard size={18} /></button>
         <button className="icon-btn" onClick={toggleTheme} title="Tema terang / gelap"><ThemeIcon size={18} /></button>
         <button className="icon-btn" onClick={toggleFs} title="Layar penuh"><Maximize size={18} /></button>
@@ -63,16 +74,17 @@ export default function Shell({ user, onLogout }) {
           {notice && <div className="banner info">{notice}<button onClick={clearNotice} title="Tutup">×</button></div>}
           {loading ? <div className="empty">Memuat data...</div> : (
             <>
-              {page === 'monitoring' && <Monitoring by={user.username} />}
+              {page === 'monitoring' && <Monitoring key={navKey} by={user.username} />}
               {page === 'upload' && <UploadExcel by={user.username} />}
               {page === 'delete' && <DeleteData by={user.username} />}
               {page === 'log' && <Riwayat />}
-              {page === 'cadangan' && <Cadangan />}
+              {page === 'cadangan' && <Cadangan key={navKey} />}
             </>
           )}
         </main>
       </div>
       {cari && <CariGlobal onClose={() => setCari(false)} onPick={pick} />}
+      {panduan.buka && <Panduan />}
       {pin && <Pintasan onClose={() => setPin(false)} />}
     </div>
   )
