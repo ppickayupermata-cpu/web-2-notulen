@@ -37,7 +37,7 @@ export default function Notulen({ group, rows, calc, onClose }) {
   // ---------- isi notulen ----------
   // nilai sel yang berisi rumus (=...) dihitung dulu, supaya yang masuk notulen adalah hasilnya, bukan teks rumus
   const tabel = dariTabel(calc ? rows.map((r) => ({ ...r, area: calc(r, 'area'), target: calc(r, 'target'), ket: calc(r, 'ket') })) : rows)
-  const hadir = [...new Map([...log.filter((e) => e.confirmed).map((e) => `${e.nama} ( ${e.bagian} )`), ...manual.filter((p) => p.hadir).map(lbl)].map((x) => [x.toLowerCase(), x])).values()]
+  const hadir = [...new Map([...log.filter((e) => e.confirmed).sort((a, b) => String(a.confirmedAt || a.at).localeCompare(String(b.confirmedAt || b.at))).map((e) => `${e.nama} ( ${e.bagian} )`), ...manual.filter((p) => p.hadir).map(lbl)].map((x) => [x.toLowerCase(), x])).values()]
   // jam mulai / selesai otomatis dari tombol Meeting dimulai / ditutup (jam server, WIB); hanya untuk meeting yang berjalan atau hari ini
   useEffect(() => {
     if (!meeting) return

@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { ListChecks, GitMerge, Replace, X, Undo2, UploadCloud, Columns3, FolderPlus } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ListChecks, GitMerge, Replace, X, Undo2, UploadCloud, Columns3, FolderPlus, FolderSearch } from 'lucide-react'
 import { parseExcel } from '../utils/parseExcel.js'
-import { bandingkan, cariGrup } from '../utils/diffRows.js'
+import { bandingkan, cariGrup, kandidatContainer } from '../utils/diffRows.js'
+import PilihContainer from '../components/PilihContainer.jsx'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { INFO_COLS } from '../config.js'
@@ -20,6 +21,7 @@ function UploadBiasa({ by }) {
   const [busy, setBusy] = useState(false)
   const [fileKey, setFileKey] = useState(0)
   const [custom, setCustom] = useState(false)
+  const [pilihId, setPilihId] = useState(null), [pilihBuka, setPilihBuka] = useState(false), [hanyaBaru, setHanyaBaru] = useState(false)   // container tujuan pilihan sendiri; filter baris baru
   const [pick, setPick] = useState(new Set())  // indeks baris upload yang diterapkan (mode custom)
   const [hapus, setHapus] = useState(new Set()) // id baris lama (tidak ada di file baru) yang dipilih untuk dihapus
   const [src, setSrc] = useState(null)        // file yang sedang dibaca (untuk baca ulang saat pemetaan kolom diubah)
@@ -27,12 +29,12 @@ function UploadBiasa({ by }) {
   const [over, setOver] = useState(false)     // sedang menyeret file di atas area upload
   const [baruOpen, setBaruOpen] = useState(false), [namaBaru, setNamaBaru] = useState('')  // form "Buat container baru"
 
-  const reset = () => { setParsed(null); setSrc(null); setOvr({}); setCustom(false); setPick(new Set()); setHapus(new Set()); setBaruOpen(false); setNamaBaru(''); setFileKey((k) => k + 1) }
+  const reset = () => { setParsed(null); setSrc(null); setOvr({}); setCustom(false); setPick(new Set()); setHapus(new Set()); setBaruOpen(false); setNamaBaru(''); setPilihId(null); setPilihBuka(false); setHanyaBaru(false); setFileKey((k) => k + 1) }
   const baca = async (file, override = {}) => {
     try {
       const p = await parseExcel(file, override)
       if (!p.header.container) throw new Error('Nomor Container tidak ditemukan di bagian atas file.')
-      setParsed({ ...p, fileName: file.name }); setCustom(false); setPick(new Set()); setHapus(new Set())
+      setParsed({ ...p, fileName: file.name }); setCustom(false); setPick(new Set()); setHapus(new Set()); setPilihId(null); setPilihBuka(false); setHanyaBaru(false)
       setMsg(p.missing.length
         ? { type: 'err', text: `Kolom ${p.missing.map((f) => (f === 'so' ? 'SO' : 'Qty')).join(' dan ')} belum terpetakan. Atur di panel "Pemetaan kolom" di bawah.` }
         : { type: 'ok', text: `${p.rows.length} baris terbaca di ${new Set(p.rows.map((r) => r.so)).size} SO. Tiap SO ditampilkan di tabel terpisah. Periksa lalu klik Import.` })
@@ -44,7 +46,9 @@ function UploadBiasa({ by }) {
   const petakan = (i, field) => { const o = { ...ovr, [i]: field }; setOvr(o); baca(src, o) }
 
   // container yang sama / SO yang sama sudah tersimpan? -> bandingkan baris
-  const target = parsed ? cariGrup(parsed.header, parsed.rows, groups, allRows) : null
+  const auto = parsed ? cariGrup(parsed.header, parsed.rows, groups, allRows) : null
+  const target = (pilihId && groups.find((g) => g.id === pilihId)) || auto            // pilihan sendiri menggantikan deteksi otomatis
+  const kandidat = useMemo(() => (parsed ? kandidatContainer(parsed.rows, groups, allRows) : []), [parsed, groups, allRows])
   const lama = target ? allRows.filter((r) => r.groupId === target.id) : []
   const byId = new Map(lama.map((r) => [r.id, r]))
   const diff = parsed && target ? bandingkan(parsed.rows, lama) : null
@@ -59,7 +63,8 @@ function UploadBiasa({ by }) {
   })()
 
   const finish = (ok, text) => { setBusy(false); if (!ok) return setMsg({ type: 'err', text: 'Upload gagal, data belum tersimpan. Coba lagi.' }); setMsg({ type: 'ok', text }); reset() }
-  const info = (i) => { const { area, target: t, ket, kirim, ...rest } = parsed.rows[i]; return rest }
+  const info = (i) => { const { area, target: t, ket, kirim, _baris, ...rest } = parsed.rows[i]; return rest }
+  const bersih = (rows) => rows.map(({ _baris, ...r }) => r)   // _baris = nomor baris Excel, hanya untuk pratinjau
 
   const gabung = async () => { // hanya menambah baris baru (kolom input kosong); data lama dan isiannya tidak disentuh
     setBusy(true)
@@ -76,7 +81,7 @@ function UploadBiasa({ by }) {
     if (!nama) return setMsg({ type: 'err', text: 'Nama container baru tidak boleh kosong.' })
     if (groups.some((g) => g.container.trim().toLowerCase() === nama.toLowerCase())) return setMsg({ type: 'err', text: `Container ${nama} sudah ada. Pakai nama lain.` })
     setBusy(true)
-    finish(await addGroup({ ...parsed.header, container: nama }, parsed.rows, by, parsed.fileName, 'baru'), `Container baru ${nama} dibuat (${parsed.rows.length} baris). Container ${target.container} tidak diubah; data lama bisa dimasukkan lewat tombol Pindah data di kolom Aksi Monitoring.`)
+    finish(await addGroup({ ...parsed.header, container: nama }, bersih(parsed.rows), by, parsed.fileName, 'baru'), `Container baru ${nama} dibuat (${parsed.rows.length} baris). Container ${target.container} tidak diubah; data lama bisa dimasukkan lewat tombol Pindah data di kolom Aksi Monitoring.`)
   }
   const terapkan = async () => {
     setBusy(true)
@@ -91,7 +96,7 @@ function UploadBiasa({ by }) {
       if (!ok) return
     }
     setBusy(true)
-    finish(await addGroup(target ? { ...header, container: target.container } : header, rows, by, fileName), `Container ${target?.container || header.container}: ${rows.length} baris berhasil diimport${target ? ' (data lama diganti)' : ''}.`)
+    finish(await addGroup(target ? { ...header, container: target.container } : header, bersih(rows), by, fileName), `Container ${target?.container || header.container}: ${rows.length} baris berhasil diimport${target ? ' (data lama diganti)' : ''}.`)
   }
   const pulihkan = async (b) => {
     const ada = groups.find((g) => g.container === b.container), nAda = ada ? allRows.filter((r) => r.groupId === ada.id).length : 0
@@ -136,6 +141,11 @@ function UploadBiasa({ by }) {
                     <option value="">Abaikan</option>{INFO_COLS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
                   </select></label>))}</div>
             </details>
+            <div className="toolbar wrap">
+              <button className="btn" onClick={() => setPilihBuka((v) => !v)} aria-expanded={pilihBuka} disabled={busy || !groups.length}><FolderSearch size={15} /> Pilih container tujuan</button>
+              <span className="hint">{target ? <>Tujuan: <b>{target.container}</b> {pilihId && groups.some((g) => g.id === pilihId) ? '(dipilih manual)' : '(terdeteksi otomatis)'} · <b>{nBaru}</b> baris baru</> : 'Container belum dikenali: akan dibuat container baru'}</span>
+            </div>
+            {pilihBuka && <PilihContainer kandidat={kandidat} terpilihId={target?.id} autoId={auto?.id} onPilih={(g) => { setPilihId(g.id); setPilihBuka(false); setCustom(false); setPick(new Set()); setHapus(new Set()) }} onOtomatis={() => { setPilihId(null); setPilihBuka(false) }} onTutup={() => setPilihBuka(false)} />}
             {!target && <button className="btn primary" disabled={busy || !parsed.rows.length} onClick={gantiSemua}>{busy ? 'Menyimpan...' : `Import ${parsed.rows.length} baris`}</button>}
             {target && (
               <div className="updiff">
@@ -177,20 +187,20 @@ function UploadBiasa({ by }) {
           </div>
           <div className="tablewrap" style={{ padding: 0 }}>
             <table className="grid">
-              <thead><tr><th /><th>Status</th><th>SO</th><th>SO Item</th><th>PO</th><th>Product Name</th><th>Qty</th><th>Perbedaan (lama → baru)</th></tr></thead>
+              <thead><tr><th /><th>Status</th><th>Baris Excel</th><th>SO</th><th>SO Item</th><th>PO</th><th>Product Name</th><th>Qty</th><th>Perbedaan (lama → baru)</th></tr></thead>
               <tbody>
                 {parsed.rows.map((r, i) => { const d = diff[i], ex = byId.get(d.exId); return (
                   <tr key={i} className={'up-' + d.kind}>
                     <td><input type="checkbox" className="chk" checked={pick.has(i)} onChange={() => toggle(i)} aria-label={'Pilih baris ' + (i + 1)} /></td>
                     <td><span className={'chip-st up-' + d.kind}>{TAG[d.kind]}</span></td>
-                    <td>{r.so}</td><td>{r.soItem}</td><td>{r.po}</td><td>{r.productName}</td><td>{r.qty}</td>
+                    <td>{r._baris}</td><td>{r.so}</td><td>{r.soItem}</td><td>{r.po}</td><td>{r.productName}</td><td>{r.qty}</td>
                     <td>{d.beda?.map((k) => `${LBL[k]}: ${ex?.[k] || '(kosong)'} → ${r[k] || '(kosong)'}`).join(' · ')}</td>
                   </tr>) })}
                 {hilang.map((r) => (
                   <tr key={r.id} className="up-hilang">
                     <td><input type="checkbox" className="chk" checked={hapus.has(r.id)} onChange={() => toggleDel(r.id)} aria-label="Hapus baris ini dari container" /></td>
                     <td><span className="chip-st up-hilang">Tidak ada di file</span></td>
-                    <td>{r.so}</td><td>{r.soItem}</td><td>{r.po}</td><td>{r.productName}</td><td>{r.qty}</td>
+                    <td>-</td><td>{r.so}</td><td>{r.soItem}</td><td>{r.po}</td><td>{r.productName}</td><td>{r.qty}</td>
                     <td>{hapus.has(r.id) ? 'Akan DIHAPUS' : 'Dipertahankan (centang untuk menghapus)'}</td>
                   </tr>))}
               </tbody>
@@ -198,18 +208,19 @@ function UploadBiasa({ by }) {
           </div>
         </div>
       )}
+      {parsed && diff && <div className="toolbar wrap"><label className="swlabel"><input type="checkbox" checked={hanyaBaru} onChange={(e) => setHanyaBaru(e.target.checked)} /> Tampilkan hanya baris baru ({nBaru})</label></div>}
       {parsed && (() => {
-        const bySo = new Map(); parsed.rows.forEach((r, i) => bySo.set(r.so, [...(bySo.get(r.so) || []), i]))
+        const bySo = new Map(); parsed.rows.forEach((r, i) => { if (hanyaBaru && diff && diff[i].kind !== 'baru') return; bySo.set(r.so, [...(bySo.get(r.so) || []), i]) })
         const cols = INFO_COLS
-        const W = 140, tw = W * cols.length + (diff ? 90 : 0)
+        const W = 140, tw = W * cols.length + 90 + (diff ? 90 : 0)
         return [...bySo].map(([so, list]) => (
           <div key={so} className="sobox">
             <div className="sotitle">SO {so}<small> · {list.length} baris{diff ? ` · ${list.filter((i) => diff[i].kind === 'baru').length} baru` : ''}</small></div>
             <div className="tablewrap" style={{ padding: 0 }}>
               <table className="grid fx" style={{ width: tw }}>
-                <colgroup>{diff && <col style={{ width: 90 }} />}{cols.map((c) => <col key={c.key} style={{ width: W }} />)}</colgroup>
-                <thead><tr>{diff && <th>Status</th>}{cols.map((c) => <th key={c.key}>{c.label}</th>)}</tr></thead>
-                <tbody>{list.map((i) => <tr key={i} className={diff ? 'up-' + diff[i].kind : ''}>{diff && <td><span className={'chip-st up-' + diff[i].kind}>{TAG[diff[i].kind]}</span></td>}{cols.map((c) => <td key={c.key}>{parsed.rows[i][c.key]}</td>)}</tr>)}</tbody>
+                <colgroup>{diff && <col style={{ width: 90 }} />}<col style={{ width: 90 }} />{cols.map((c) => <col key={c.key} style={{ width: W }} />)}</colgroup>
+                <thead><tr>{diff && <th>Status</th>}<th>Baris Excel</th>{cols.map((c) => <th key={c.key}>{c.label}</th>)}</tr></thead>
+                <tbody>{list.map((i) => <tr key={i} className={diff ? 'up-' + diff[i].kind : ''}>{diff && <td><span className={'chip-st up-' + diff[i].kind}>{TAG[diff[i].kind]}</span></td>}<td>{parsed.rows[i]._baris}</td>{cols.map((c) => <td key={c.key}>{parsed.rows[i][c.key]}</td>)}</tr>)}</tbody>
               </table>
             </div>
           </div>

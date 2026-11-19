@@ -6,7 +6,7 @@ import Bantuan from '../components/Bantuan.jsx'
 import { cocokTeks } from '../utils/filter.js'
 import FilterBar from '../components/FilterBar.jsx'
 
-const TYPES = { upload: 'Upload', hapus: 'Hapus', barang: 'Barang Jadi', jadwal: 'Jadwal', error: 'Error' }
+const TYPES = { upload: 'Upload', hapus: 'Hapus', barang: 'Barang Jadi', absen: 'Absensi', jadwal: 'Jadwal', error: 'Error' }
 const TANPA = '(Tanpa container)'
 
 // Riwayat dipisah per container: satu kelompok per container (yang paling baru aktif di atas), tiap kelompok berisi catatannya.

@@ -7,7 +7,7 @@ import { useData } from './DataContext.jsx'
 export function useMeeting() {
   const { token } = useData()
   const [d, setD] = useState(null), [err, setErr] = useState(''), [busy, setBusy] = useState(false), [offset, setOffset] = useState(0)
-  const terima = useCallback((x) => { setD(x); setErr(''); if (x?.now) setOffset(Date.parse(x.now) - Date.now()) }, [])
+  const terima = useCallback((x) => { setD((prev) => ({ ...x, reset: x?.reset ?? prev?.reset })); setErr(''); if (x?.now) setOffset(Date.parse(x.now) - Date.now()) }, []) // reset = info reset mingguan; dipertahankan bila respons aksi tidak membawanya
   const muat = useCallback(() => api('/api/absen?current=1', { token }).then(terima).catch((e) => setErr(e.message)), [token, terima])
   useEffect(() => {
     muat()
@@ -15,5 +15,5 @@ export function useMeeting() {
     return () => clearInterval(t)
   }, [muat])
   const kirim = (body) => { setBusy(true); return api('/api/absen', { token, body }).then((x) => { terima(x); return x }).catch((e) => { setErr(e.message); return null }).finally(() => setBusy(false)) }
-  return { d, meeting: d?.meeting || null, room: d?.room || null, log: d?.log || [], offset, err, busy, kirim, muat, loaded: d !== null }
+  return { d, reset: d?.reset || null, meeting: d?.meeting || null, room: d?.room || null, log: d?.log || [], offset, err, busy, kirim, muat, loaded: d !== null }
 }

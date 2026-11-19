@@ -99,3 +99,16 @@ test('showDate: tanggal biasa, waktu ISO, dan nilai kosong tidak membuat error',
   assert.equal(showDate('2026-11-10'), '10/11/2026'); assert.equal(showDate('2026-11-10T03:10:00.000Z'), '10/11/2026')
   assert.equal(showDate(undefined), '-'); assert.equal(showDate(''), '-')
 })
+
+import { kandidatContainer } from '../src/utils/diffRows.js'
+test('upload ulang dengan tambahan banyak data di bawah tetap dikenali sebagai container yang sama', () => {
+  const g = [{ id: 'G1', container: 'AF-28', packingListNo: 'PL-A' }, { id: 'G2', container: 'LAIN', packingListNo: 'PL-B' }]
+  const lama = Array.from({ length: 100 }, (_, i) => ({ id: 'a' + i, groupId: 'G1', so: String(1000 + Math.floor(i / 5)), soItem: String((i % 5) * 10 + 10), productName: 'X' + i }))
+  const lain = [{ id: 'z', groupId: 'G2', so: '9', soItem: '10' }]
+  const upload = [...lama.map(({ id, groupId, ...r }) => r), ...Array.from({ length: 160 }, (_, i) => ({ so: String(2000 + Math.floor(i / 5)), soItem: String((i % 5) * 10 + 10), productName: 'N' + i }))]
+  const t = cariGrup({ container: 'AF-28 (revisi)', packingListNo: '' }, upload, g, [...lama, ...lain])   // nama berbeda, tambahan lebih banyak dari isi lama
+  assert.equal(t?.id, 'G1')
+  const k = kandidatContainer(upload, g, [...lama, ...lain])
+  assert.equal(k[0].g.id, 'G1'); assert.equal(k[0].cocok, 100); assert.equal(k[0].baru, 160); assert.equal(k[1].cocok, 0)
+  assert.equal(cariGrup({ container: 'BARU', packingListNo: '' }, [{ so: '777', soItem: '10' }], g, [...lama, ...lain]), null)   // file yang sama sekali berbeda tidak dipaksa masuk
+})

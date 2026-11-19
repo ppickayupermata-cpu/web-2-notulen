@@ -49,9 +49,10 @@ export async function parseExcel(file, override = {}) {
   const lone = (r) => { const c = r.filter((v) => v !== ''); return c.length === 1 && typeof c[0] === 'string' && !LABELS[norm(c[0])] ? c[0].trim() : '' }
   if (!header.packingListNo) header.packingListNo = grid.slice(0, h).map(lone).find(Boolean) || ''
   const out = []
-  for (const r of grid.slice(h + 1)) {
+  for (const [k, r] of grid.slice(h + 1).entries()) {
     const row = { area: '', target: '', ket: '', kirim: '' }
     map.forEach((f, i) => { if (f && r[i] !== '') row[f] = String(r[i]).trim() })
+    row._baris = h + 2 + k   // nomor baris di Excel (hanya untuk tampilan pratinjau, tidak disimpan)
     if (row.so) out.push(row) // baris tanpa SO (judul grup, SUB TOTAL, dll) dilewati
     else if (!out.length && !header.packingListNo) header.packingListNo = lone(r) // hanya sebelum baris data pertama
   }

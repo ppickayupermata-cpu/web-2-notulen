@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { UploadCloud, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { UploadCloud, AlertTriangle, CheckCircle2, FolderSearch } from 'lucide-react'
 import { bacaFileCoAds } from '../utils/parseCoAds.js'
-import { bandingkan } from '../utils/diffRows.js'
+import { bandingkan, kandidatContainer } from '../utils/diffRows.js'
+import PilihContainer from '../components/PilihContainer.jsx'
 import { CO_ADS_COLS } from '../config.js'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { useData } from '../context/DataContext.jsx'
 
 const AKSI = { baru: 'Buat container baru', gabung: 'Gabungkan (baris baru saja, label old/new)', ganti: 'Ganti semua (cadangan otomatis)' }
 const BATAS_PRATINJAU = 150
+const TAG = { baru: 'Baru', berubah: 'Berubah', sama: 'Sudah ada' }
 
 // Upload CO ADS: menyaring file DRAFT PL (kop surat, Total, daftar PO, catatan dibuang), tiap sheet = satu container berjenis CO ADS.
 export default function UploadCoAds({ by }) {
@@ -15,6 +17,7 @@ export default function UploadCoAds({ by }) {
   const { confirm, dialog } = useConfirm()
   const [data, setData] = useState(null)       // { base, sheets: [{ ..., pilih, aksi, nama }], kosong, fileName }
   const [lihat, setLihat] = useState(0)        // indeks sheet yang dipratinjau
+  const [pilihSheet, setPilihSheet] = useState(null), [hanyaBaru, setHanyaBaru] = useState(false)   // sheet yang sedang memilih container tujuan; filter baris baru
   const [msg, setMsg] = useState(null), [busy, setBusy] = useState(false), [over, setOver] = useState(false), [fileKey, setFileKey] = useState(0)
 
   const ada = (nama) => groups.find((g) => g.container.trim().toLowerCase() === String(nama).trim().toLowerCase())
@@ -23,7 +26,7 @@ export default function UploadCoAds({ by }) {
     while (dipakai.has(n.trim().toLowerCase())) n = `${nama}-${i++}`
     return n
   }
-  const reset = () => { setData(null); setLihat(0); setFileKey((k) => k + 1) }
+  const reset = () => { setData(null); setLihat(0); setPilihSheet(null); setHanyaBaru(false); setFileKey((k) => k + 1) }
 
   const terima = async (file) => {
     if (!file) return
@@ -80,6 +83,9 @@ export default function UploadCoAds({ by }) {
   }
 
   const s = data?.sheets[lihat]
+  const tujuanS = s ? ada(s.nama) : null
+  const dS = tujuanS ? bandingkan(s.rows, allRows.filter((r) => r.groupId === tujuanS.id)) : null   // pembanding dengan container tujuan: mana baris yang baru
+  const nBaruS = dS ? dS.filter((x) => x.kind === 'baru').length : 0
   return (
     <>
       <div className="panel wide">
@@ -96,7 +102,7 @@ export default function UploadCoAds({ by }) {
         <>
           <div className="tablewrap">
             <table className="grid">
-              <thead><tr><th>Pakai</th><th>Sheet</th><th>Nama container</th><th>Buyer</th><th>Baris</th><th>SO</th><th>Total Qty</th><th>Jika nama sudah ada</th><th></th></tr></thead>
+              <thead><tr><th>Pakai</th><th>Sheet</th><th>Nama container</th><th>Buyer</th><th>Baris</th><th>SO</th><th>Total Qty</th><th>Jika nama sudah ada</th><th>Tujuan</th><th></th></tr></thead>
               <tbody>{data.sheets.map((x, i) => {
                 const t = ada(x.nama), cocok = x.totalFile === null || x.totalFile === x.totalHitung
                 return (
@@ -107,11 +113,15 @@ export default function UploadCoAds({ by }) {
                     <td>{x.buyer || '-'}</td><td>{x.rows.length}</td><td>{new Set(x.rows.map((r) => r.so)).size}</td>
                     <td>{x.totalHitung}{x.totalFile !== null && (cocok ? <span title="Sama dengan baris Total di file" className="ok-ic"> <CheckCircle2 size={14} /></span> : <span title={`Total di file: ${x.totalFile}`} className="warn-ic"> <AlertTriangle size={14} /> file {x.totalFile}</span>)}</td>
                     <td>{t ? <select value={x.aksi} onChange={(e) => ubah(i, { aksi: e.target.value })} aria-label="Tindakan"><option value="baru">{AKSI.baru}</option><option value="gabung">{AKSI.gabung}</option><option value="ganti">{AKSI.ganti}</option></select> : <span className="chip-st up-baru">Baru</span>}</td>
+                    <td><button className="btn sm" onClick={() => setPilihSheet(pilihSheet === i ? null : i)} aria-expanded={pilihSheet === i} title="Masukkan ke container yang sudah ada"><FolderSearch size={14} /> Pilih container</button></td>
                     <td><button className="btn sm" onClick={() => setLihat(i)}>Pratinjau</button></td>
                   </tr>)
               })}</tbody>
             </table>
           </div>
+          {pilihSheet !== null && data.sheets[pilihSheet] && (() => { const x = data.sheets[pilihSheet], cn = ada(x.nama); return (
+            <PilihContainer kandidat={kandidatContainer(x.rows, groups.filter((g) => g.kind === 'coads'), allRows)} terpilihId={cn?.id} autoId={cn?.id}
+              onPilih={(g) => { ubah(pilihSheet, { nama: g.container, aksi: 'gabung' }); setLihat(pilihSheet); setPilihSheet(null) }} onTutup={() => setPilihSheet(null)} />) })()}
           <div className="toolbar wrap">
             <button className="btn primary" disabled={busy} onClick={simpan}>{busy ? 'Menyimpan...' : `Simpan ${data.sheets.filter((x) => x.pilih).length} sheet`}</button>
             <button className="btn" disabled={busy} onClick={reset}>Batal</button>
@@ -122,10 +132,11 @@ export default function UploadCoAds({ by }) {
               <h3 style={{ marginTop: 0 }}>Pratinjau sheet {s.sheet} <small>{s.rows.length} baris{s.rows.length > BATAS_PRATINJAU ? `, ${BATAS_PRATINJAU} pertama` : ''}</small></h3>
               {s.warnings.length > 0 && <div className="msg warn"><b>Perlu dicek:</b>{s.warnings.slice(0, 8).map((w, i) => <div key={i}>{w}</div>)}{s.warnings.length > 8 && <div>+{s.warnings.length - 8} peringatan lain</div>}</div>}
               {s.catatan.length > 0 && <div className="hint">Catatan di file (tidak diimpor): {s.catatan.join(' | ')}</div>}
+              {dS && <div className="toolbar wrap"><span className="hint">Dibandingkan dengan <b>{tujuanS.container}</b>: <b>{nBaruS}</b> baris baru</span><label className="swlabel"><input type="checkbox" checked={hanyaBaru} onChange={(e) => setHanyaBaru(e.target.checked)} /> Tampilkan hanya baris baru</label></div>}
               <div className="tablewrap">
                 <table className="grid">
-                  <thead><tr>{CO_ADS_COLS.map((c) => <th key={c.key}>{c.label}</th>)}</tr></thead>
-                  <tbody>{s.rows.slice(0, BATAS_PRATINJAU).map((r, i) => <tr key={i}>{CO_ADS_COLS.map((c) => <td key={c.key}>{r[c.key] ?? ''}</td>)}</tr>)}</tbody>
+                  <thead><tr>{dS && <th>Status</th>}<th>Baris Excel</th>{CO_ADS_COLS.map((c) => <th key={c.key}>{c.label}</th>)}</tr></thead>
+                  <tbody>{s.rows.map((r, i) => ({ r, i })).filter(({ i }) => !hanyaBaru || !dS || dS[i].kind === 'baru').slice(0, BATAS_PRATINJAU).map(({ r, i }) => <tr key={i} className={dS ? 'up-' + dS[i].kind : ''}>{dS && <td><span className={'chip-st up-' + dS[i].kind}>{TAG[dS[i].kind]}</span></td>}<td>{r._baris}</td>{CO_ADS_COLS.map((c) => <td key={c.key}>{r[c.key] ?? ''}</td>)}</tr>)}</tbody>
                 </table>
               </div>
             </div>

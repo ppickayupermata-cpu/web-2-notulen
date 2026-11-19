@@ -1,25 +1,30 @@
 import { useEffect, useState } from 'react'
-import { X, Lock, Unlock, CheckCheck, Check, Undo2, Trash2, QrCode, Play, Square, Radio, RefreshCw } from 'lucide-react'
+import { X, Lock, Unlock, CheckCheck, Check, Undo2, Trash2, QrCode, Play, Square, Radio, RefreshCw, RotateCcw } from 'lucide-react'
 import BagikanLink from './BagikanLink.jsx'
 import JamMerah, { jamStr } from './JamMerah.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { useMeeting } from '../context/useMeeting.js'
 import Bantuan from './Bantuan.jsx'
-import { jamWIB } from '../utils/waktu.js'
+import { jamWIB, tglWIB } from '../utils/waktu.js'
+import { showDate } from '../utils/date.js'
 
 // Absensi & Meeting: SATU absensi untuk seluruh container (peserta cukup absen sekali), tombol Meeting dimulai / Meeting ditutup,
 // konfirmasi oleh admin, dan satu link LIVE meeting yang otomatis mengikuti container yang sedang dibuka host.
 // Isi panel (tanpa pembungkus modal): dipakai di dialog Absensi & Meeting dan di dalam Catat Notulen. mt = hasil useMeeting().
 export function PanelMeeting({ mt, defaultNama = 'MEETING CUSTOM ORDER' }) {
   const { ask } = useData()
-  const { meeting, room, log, err, busy, kirim, offset, loaded } = mt
+  const { meeting, room, log, err, busy, kirim, offset, loaded, reset } = mt
   const [nama, setNama] = useState(defaultNama), [auto, setAuto] = useState(false)
   const [lv, setLv] = useState(null)   // link live meeting { token, enabled }
+  const [rLokal, setRLokal] = useState(null)   // saklar reset: berubah seketika, lalu mengikuti jawaban server (kembali bila gagal)
   useEffect(() => { ask('liveMeetingLink', {}).then((x) => setLv(x || false)) }, [])
   const ubahLive = async (extra) => { const x = await ask('liveMeetingLink', extra); if (x) setLv(x) }
   const jalan = meeting?.status === 'berjalan', nOk = log.filter((l) => l.confirmed).length
   const url = room ? `${location.origin}/?absen=${room.id}` : '', liveUrl = lv ? `${location.origin}/?meeting=${lv.token}` : ''
   const mulai = () => kirim({ action: 'startMeeting', nama, autoConfirm: auto })
+  const resetAktif = rLokal ?? reset?.aktif !== false
+  const ubahReset = (v) => { setRLokal(v); kirim({ action: 'setAbsenReset', aktif: v }).finally(() => setRLokal(null)) }
+  const resetManual = () => window.confirm('Reset absensi sekarang?\n\nDaftar hadir minggu ini disembunyikan (data tetap tersimpan di database), absensi ditutup, dan QR lama tidak berlaku lagi. Meeting berikutnya mulai dengan daftar kosong.') && kirim({ action: 'resetAbsensi' })
   const tutup = () => window.confirm(`Tutup meeting?\n\nAbsensi ditutup dan jam selesai dicatat (${nOk} peserta terkonfirmasi, ${log.length - nOk} menunggu). Daftar hadir tetap tersimpan dan terbaca di notulen.`) && kirim({ action: 'endMeeting' })
   return (
     <>
@@ -42,6 +47,16 @@ export function PanelMeeting({ mt, defaultNama = 'MEETING CUSTOM ORDER' }) {
           )}
         </div>}
 
+        {loaded && <div className="ntsec"><h4><RotateCcw size={14} style={{ verticalAlign: '-2px' }} /> Reset absensi mingguan</h4>
+          <div className="toolbar wrap">
+            <label className="swlabel"><input type="checkbox" checked={resetAktif} disabled={busy} onChange={(e) => ubahReset(e.target.checked)} /> Reset otomatis tiap Rabu 00.00 WIB</label>
+            <span className={'chip-st ' + (resetAktif ? 'buka' : 'tutup')} style={{ margin: 0 }}>{resetAktif ? 'Aktif' : 'Nonaktif'}</span>
+            {resetAktif && reset?.berikutnya && <span className="hint">Reset berikutnya: Rabu, {showDate(tglWIB(reset.berikutnya))} 00.00 WIB</span>}
+            <span className="spacer" />
+            <button className="btn danger" disabled={busy || !meeting} onClick={resetManual}><RotateCcw size={15} /> Reset sekarang</button>
+          </div>
+        </div>}
+
         {room && <div className="ntsec"><h4>Absensi</h4>
           <BagikanLink url={url} judul={'Absensi · ' + (meeting?.nama || 'Meeting')} sub={room.closed ? 'Absensi ditutup' : 'Scan untuk absen'} />
           <div className="toolbar wrap" style={{ marginTop: 8 }}>
@@ -52,11 +67,11 @@ export function PanelMeeting({ mt, defaultNama = 'MEETING CUSTOM ORDER' }) {
           </div>
           <div className="tablewrap">
             <table className="grid">
-              <thead><tr><th>#</th><th>Nama</th><th>Bagian</th><th>Waktu</th><th>Status</th><th>Aksi</th></tr></thead>
+              <thead><tr><th>#</th><th>Nama</th><th>Bagian</th><th>Waktu absen</th><th>Waktu masuk</th><th>Status</th><th>Aksi</th></tr></thead>
               <tbody>
-                {!log.length && <tr><td colSpan="6" className="hint">Belum ada yang absen.</td></tr>}
+                {!log.length && <tr><td colSpan="7" className="hint">Belum ada yang absen.</td></tr>}
                 {log.map((l, i) => (
-                  <tr key={l.id}><td>{i + 1}</td><td>{l.nama}</td><td>{l.bagian}</td><td>{jamStr(l.at)}</td>
+                  <tr key={l.id}><td>{i + 1}</td><td>{l.nama}</td><td>{l.bagian}</td><td>{jamStr(l.at)}</td><td>{l.confirmedAt ? jamStr(l.confirmedAt) : '—'}</td>
                     <td>{l.confirmed ? <span className="chip-st buka" style={{ margin: 0 }}>Terkonfirmasi</span> : <span className="chip-st" style={{ margin: 0, background: '#fef3c7', color: '#92400e' }}>Menunggu</span>}</td>
                     <td className="actions">
                       {l.confirmed ? <button className="btn sm" disabled={busy} onClick={() => kirim({ action: 'confirm', room: room.id, id: l.id, confirmed: false })}><Undo2 size={13} /> Batalkan</button>

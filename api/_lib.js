@@ -45,6 +45,7 @@ export function ensureDb() {
           nama text not null, bagian text not null, k text not null, at timestamptz not null default now(), unique (room_id, k))`,
       db`create table if not exists meetings (id text primary key, nama text not null default '', status text not null default 'berjalan', room_id text references absen_rooms(id) on delete set null, started_at timestamptz not null default now(), ended_at timestamptz, started_by text not null default '', auto_confirm boolean not null default false)`,
       db`create table if not exists live_global (id text primary key, token text not null unique, enabled boolean not null default true, last_group_id text, last_at timestamptz, created_at timestamptz not null default now())`,
+      db`alter table meetings add column if not exists reset_at timestamptz`,
       db`alter table logs add column if not exists container text`,
       db`update logs set container = coalesce((regexp_match(detail, 'Container (.+?)(?: · | → |: |, | [(]|$)'))[1], '') where container is null`,
       db`delete from backups where kind = 'pindah'`,

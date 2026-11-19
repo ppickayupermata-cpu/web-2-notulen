@@ -31,7 +31,7 @@ export default function NotulenGabungan({ groups, rows, onClose }) {
   const ambilAbsen = async (gs) => { // peserta terkonfirmasi: absensi meeting (satu untuk semua container) + absensi lama per container
     const gm = await api('/api/absen?current=1', { token }).catch(() => null), m = gm?.meeting
     if (m && (m.status === 'berjalan' || tglWIB(m.startedAt) === today())) setInfo((i) => ({ ...i, tanggal: tglWIB(m.startedAt), mulai: jamWIB(m.startedAt), ...(m.endedAt ? { selesai: jamWIB(m.endedAt) } : {}) })) // jam dari tombol Meeting dimulai / ditutup
-    const global = (gm?.log || []).filter((l) => l.confirmed).map((l) => `${l.nama} ( ${l.bagian} )`)
+    const global = (gm?.log || []).filter((l) => l.confirmed).sort((a, b) => String(a.confirmedAt || a.at).localeCompare(String(b.confirmedAt || b.at))).map((l) => `${l.nama} ( ${l.bagian} )`)
     const hasil = await Promise.all(gs.map((g) => api('/api/absen?groupId=' + encodeURIComponent(g.id), { token }).then((x) => (x.log || []).filter((l) => l.confirmed).map((l) => `${l.nama} ( ${l.bagian} )`)).catch(() => [])))
     return [...global, ...hasil.flat()]
   }
