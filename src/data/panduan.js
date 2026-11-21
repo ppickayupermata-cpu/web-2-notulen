@@ -198,7 +198,7 @@ export const TOPIK = [
       '**Peserta terbaru** memperbarui daftar peserta tanpa mengubah bagian lain. **Susun ulang** mengisi ulang seluruh halaman dari tabel dan data meeting. **Absen manual** untuk menambah nama tanpa QR.',
       'Keluarkan hasilnya: **Unduh notulen (.docx)**, **Cetak / PDF**, atau **Salin teks (WhatsApp)**. **Simpan versi** dan **Riwayat versi** menyimpan dan membuka kembali versi halaman.',
     ],
-    tips: ['**Gabungkan notulen** (Monitoring, kanan atas) menggabungkan beberapa container menjadi satu halaman: pilih container (semua atau custom select), hanya baris yang sudah terisi atau dipacking yang masuk, seluruh halaman bisa diedit langsung.', 'Notulen tersimpan di perangkat ini sebagai draft sehingga tidak hilang saat jendela ditutup.'],
+    tips: ['**Gabungkan notulen** (Monitoring, kanan atas) menggabungkan beberapa container menjadi satu halaman: hanya baris yang sudah terisi atau dipacking yang masuk, dan seluruh halaman bisa diedit langsung. Centang container yang diinginkan; container yang dicentang masuk di urutan paling bawah, dan daftar **Urutan di notulen** bisa diubah dengan **seret dan lepas** (atau tombol naik / turun): yang paling atas muncul pertama di notulen. Kolom **Urutan** di tabel menunjukkan nomornya.', '**Rapatkan spasi** (bawaan aktif, di pratinjau gabungan) menghilangkan baris kosong berlebih di antara SO dan container supaya hasilnya ringkas; matikan untuk kembali ke susunan berjarak.', 'Notulen tersimpan di perangkat ini sebagai draft sehingga tidak hilang saat jendela ditutup.'],
   },
   {
     id: 'hapus', judul: 'Hapus Data', ringkas: 'Menghapus container atau baris, langsung atau terjadwal.',

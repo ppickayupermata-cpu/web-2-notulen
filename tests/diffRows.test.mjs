@@ -112,3 +112,18 @@ test('upload ulang dengan tambahan banyak data di bawah tetap dikenali sebagai c
   assert.equal(k[0].g.id, 'G1'); assert.equal(k[0].cocok, 100); assert.equal(k[0].baru, 160); assert.equal(k[1].cocok, 0)
   assert.equal(cariGrup({ container: 'BARU', packingListNo: '' }, [{ so: '777', soItem: '10' }], g, [...lama, ...lain]), null)   // file yang sama sekali berbeda tidak dipaksa masuk
 })
+
+import { susunGabungan as sg2 } from '../src/utils/isiNotulen.js'
+import { dariTabel as dt2 } from '../src/utils/notulen.js'
+test('notulen gabungan: mode rapat tidak menyisakan baris kosong berlebih', () => {
+  const mk = (g, so, po, area, tgl) => ({ groupId: g, so, po, area, target: tgl, ket: '', kirim: '', soItem: '10' })
+  const secs = [['CONT-A', [mk('A', '1', 'P1', 'PC', '2026-11-20'), mk('A', '2', 'P2', 'WC', '2026-11-21')]], ['CONT-B', [mk('B', '3', 'P3', 'PC', '2026-11-22'), mk('B', '4', 'P4', 'AS', '2026-11-23')]]].map(([h, r]) => ({ heading: h, items: dt2(r).items }))
+  const dasar = { judul: 'N', hari: 'h', tempat: 't', jam: 'j', hadir: ['A ( X )'], sections: secs, note: 'n', rincian: [] }
+  const lama = sg2({ ...dasar }), rapat = sg2({ ...dasar, rapat: true })
+  const maxKosong = (t) => Math.max(0, ...(t.match(/\n{2,}/g) || []).map((x) => x.length - 1))
+  assert.ok(maxKosong(lama) >= 2)                       // susunan lama: 2 baris kosong antar container
+  assert.ok(maxKosong(rapat) <= 1)                      // rapat: paling banyak satu
+  assert.ok(!/\*CONT-A\n\n/.test(rapat))                // tidak ada baris kosong setelah judul
+  assert.ok(rapat.length < lama.length)
+  assert.ok(rapat.indexOf('CONT-A') < rapat.indexOf('CONT-B'))
+})

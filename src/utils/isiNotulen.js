@@ -26,9 +26,10 @@ export const teksBaris = (list) => barisSO(list).flat().map((l) => l.replace(/^\
 
 // Isi catatan dari tabel: tiap SO satu blok baris, antar SO diberi baris kosong; yang sudah dipacking di bagian bawah.
 // selesaiDiAtas: yang sudah dicentang (urutan dicentang, yang pertama paling atas) ditaruh di ATAS yang belum; false = di bawah (bawaan lama).
-export function susun(items, heading, selesaiDiAtas = false) {
+// rapat: tanpa baris kosong setelah judul dan di antara SO (hasil gabungan jadi ringkas, tidak perlu menghapus spasi satu per satu)
+export function susun(items, heading, selesaiDiAtas = false, rapat = false) {
   const a = barisSO(items.filter((i) => !i.selesai)), b = barisSO(items.filter((i) => i.selesai))
-  return [...(heading ? ['*' + heading, ''] : []), (selesaiDiAtas ? [...b, ...a] : [...a, ...b]).map((g) => g.join('\n')).join('\n\n')].join('\n').trimEnd()
+  return [...(heading ? ['*' + heading, ...(rapat ? [] : [''])] : []), (selesaiDiAtas ? [...b, ...a] : [...a, ...b]).map((g) => g.join('\n')).join(rapat ? '\n' : '\n\n')].join('\n').trimEnd()
 }
 
 // Satu halaman penuh: judul, keterangan meeting, peserta, catatan per SO, NOTE.
@@ -39,9 +40,10 @@ export function susunDokumen({ judul, hari, tempat, jam, hadir, items, heading, 
 
 // Notulen GABUNGAN beberapa container: satu judul, satu keterangan, satu daftar peserta, lalu tiap container menjadi satu bagian
 // (judul container + daftar per SO). Antar container diberi DUA baris kosong supaya jelas terpisah; di dalam satu container tetap satu baris kosong antar SO.
-export function susunGabungan({ judul, hari, tempat, jam, hadir, sections, note, rincian = [], selesaiDiAtas = false }) {
-  const bagian = sections.filter((s) => s.items.length).map((s) => susun(s.items, s.heading, selesaiDiAtas)), rs = ringkasArea(rincian)
-  return [judul, `Hari,Tanggal : ${hari}`, `Tempat : ${tempat}`, `Jam : ${jam}`, 'Peserta :', ...hadir.map((h) => BUL + h), '', bagian.join('\n\n\n'), ...(rs ? ['', '', rs] : []), '', `NOTE : ${note}`].join('\n')
+export function susunGabungan({ judul, hari, tempat, jam, hadir, sections, note, rincian = [], selesaiDiAtas = false, rapat = false }) {
+  const bagian = sections.filter((s) => s.items.length).map((s) => susun(s.items, s.heading, selesaiDiAtas, rapat)), rs = ringkasArea(rincian)
+  const teks = [judul, `Hari,Tanggal : ${hari}`, `Tempat : ${tempat}`, `Jam : ${jam}`, 'Peserta :', ...hadir.map((h) => BUL + h), '', bagian.join(rapat ? '\n\n' : '\n\n\n'), ...(rs ? (rapat ? ['', rs] : ['', '', rs]) : []), '', `NOTE : ${note}`].join('\n')
+  return rapat ? teks.replace(/\n{3,}/g, '\n\n') : teks   // rapat: tidak pernah lebih dari SATU baris kosong berturut-turut
 }
 
 // teks halaman -> teks siap tempel di WhatsApp (judul *tebal*, bullet tetap)

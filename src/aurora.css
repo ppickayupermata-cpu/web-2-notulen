@@ -5,8 +5,8 @@
 :root{
   --royal:#334EAC;--moon:#F7F2EB;--china:#7096D1;--pear:#F2F0DE;--midnight:#081F5C;--dawn:#D0E3FF;--jicama:#FFF9F0;--porcelain:#EDF1F6;--sky:#BAD6EB;
   /* ===== TERANG ===== */
-  --bg:#EDF1F6;--card:#FFF9F0;--ink:#081F5C;--mute:#4B5F94;--line:#D3E2F1;
-  --accent:#334EAC;--accent-soft:#D0E3FF;--packed:#D9F0E5;--edit:#D0E3FF;--ok:#167A55;--err:#C73550;
+  --bg:#EDF1F6;--card:#FFFFFF;--ink:#081F5C;--mute:#4B5F94;--line:#D3E2F1;
+  --accent:#334EAC;--accent-soft:#D0E3FF;--packed:#D9F0E5;--edit:#FFFFFF;--ok:#167A55;--err:#C73550;
   --th-bg:#081F5C;--th-in:#334EAC;--th-ink:#F7F2EB;
   --field:rgba(255,255,255,.85);--btn:#FFFFFF;--pop:#FFF9F0;
   --hover:#E8F0FD;--rn:#EDF1F6;--rng:#D0E3FF;--prog:#BAD6EB;--grid-line:#9DB5DD;--grid-edge:#334EAC;
